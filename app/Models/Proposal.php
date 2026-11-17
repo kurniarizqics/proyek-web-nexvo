@@ -11,6 +11,9 @@ class Proposal extends Model
         'title',
         'amount',
         'reason',
+        'document_path',
+        'review_note',
+        'rejection_reason',
         'status',
     ];
 

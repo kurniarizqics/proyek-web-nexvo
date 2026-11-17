@@ -12,6 +12,7 @@ class Transaction extends Model
         'amount',
         'transaction_date',
         'description',
+        'proposal_id',
     ];
 
     public function category()
@@ -22,5 +23,10 @@ class Transaction extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function proposal()
+    {
+    return $this->belongsTo(Proposal::class);
     }
 }
