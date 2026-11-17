@@ -161,11 +161,12 @@
                 @php
                     $trxDate = \Carbon\Carbon::parse($trx->transaction_date);
                     $trxCode = 'TRX-' . $trxDate->format('Y') . '-' . str_pad($trx->id, 3, '0', STR_PAD_LEFT);
-                    $isIncome = ($trx->type === 'income');
+                    $trxType = $trx->resolved_type ?? ($trx->category?->type ?? 'expense');
+                    $isIncome = ($trxType === 'income');
                     $catName = $trx->category->name ?? 'Operasional';
                 @endphp
                 <tr class="trx-row"
-                    data-type="{{ $trx->type }}"
+                    data-type="{{ $trxType }}"
                     data-search="{{ strtolower($trxCode . ' ' . $catName . ' ' . $trx->description) }}">
                     <td class="py-3 ps-3 text-muted">{{ $trxDate->locale('id')->translatedFormat('d M Y') }}</td>
                     <td class="py-3" style="color: #475569;">{{ $catName }}</td>
@@ -239,7 +240,8 @@
 @php
     $trxDate = \Carbon\Carbon::parse($trx->transaction_date);
     $trxCode = 'TRX-' . $trxDate->format('Y') . '-' . str_pad($trx->id, 3, '0', STR_PAD_LEFT);
-    $isIncome = ($trx->type === 'income');
+    $trxType = $trx->resolved_type ?? ($trx->category?->type ?? 'expense');
+    $isIncome = ($trxType === 'income');
     $catName = $trx->category->name ?? 'Operasional';
     $ext = $trx->proof_path ? strtolower(pathinfo($trx->proof_path, PATHINFO_EXTENSION)) : null;
     $isImage = in_array($ext, ['jpg', 'jpeg', 'png']);
@@ -420,7 +422,7 @@
     </div>
 </div>
 
-<!-- MODAL 2: Perbesar Bukti (Sesuai Gambar 4) -->
+<!-- MODAL 2: Perbesar Bukti -->
 <div class="modal fade" id="zoomProofModal{{ $trx->id }}" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content border-0 rounded-4 shadow bg-white p-3">
@@ -467,7 +469,7 @@
     </div>
 </div>
 
-<!-- MODAL 3: Pemberitahuan Bukti Elektronik (Sesuai Gambar 5) -->
+<!-- MODAL 3: Pemberitahuan Bukti Elektronik -->
 <div class="modal fade" id="noFileModal{{ $trx->id }}" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-sm">
         <div class="modal-content border-0 rounded-4 shadow bg-white p-3">
@@ -513,7 +515,7 @@
 
                         <div class="col-md-6">
                             <label class="form-label fw-semibold" style="font-size: 13px;">Jenis Kas <span class="text-danger">*</span></label>
-                            <select name="type" class="form-select rounded-3" required>
+                            <select id="modalTypeSelect" class="form-select rounded-3" required>
                                 <option value="income">Kas Masuk (Pemasukan)</option>
                                 <option value="expense">Kas Keluar (Pengeluaran)</option>
                             </select>
@@ -521,9 +523,9 @@
 
                         <div class="col-md-6">
                             <label class="form-label fw-semibold" style="font-size: 13px;">Kategori Anggaran <span class="text-danger">*</span></label>
-                            <select name="category_id" class="form-select rounded-3" required>
+                            <select name="category_id" id="modalCategorySelect" class="form-select rounded-3" required>
                                 @foreach($categories as $cat)
-                                    <option value="{{ $cat->id }}">{{ $cat->name }}</option>
+                                    <option value="{{ $cat->id }}" data-type="{{ $cat->type }}">{{ $cat->name }}</option>
                                 @endforeach
                             </select>
                         </div>
@@ -604,6 +606,26 @@
             if (typeFilter) typeFilter.value = 'all';
             filterTransactions();
         });
+    }
+
+    // Sinkronkan opsi Kategori Anggaran di modal berdasarkan Jenis Kas yang dipilih
+    const modalTypeSelect = document.getElementById('modalTypeSelect');
+    const modalCategorySelect = document.getElementById('modalCategorySelect');
+    if (modalTypeSelect && modalCategorySelect) {
+        function syncModalCategories() {
+            const selectedType = modalTypeSelect.value;
+            let firstVisible = null;
+            Array.from(modalCategorySelect.options).forEach(opt => {
+                const match = opt.dataset.type === selectedType;
+                opt.hidden = !match;
+                if (match && !firstVisible) firstVisible = opt;
+            });
+            if (firstVisible && modalCategorySelect.selectedOptions[0]?.hidden) {
+                modalCategorySelect.value = firstVisible.value;
+            }
+        }
+        modalTypeSelect.addEventListener('change', syncModalCategories);
+        syncModalCategories();
     }
 </script>
 @endpush

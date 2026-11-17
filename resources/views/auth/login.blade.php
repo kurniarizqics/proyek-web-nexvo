@@ -196,6 +196,7 @@
             <button type="button" class="demo-badge" onclick="fillDemo('ketua@nexvo.com')">Ketua</button>
             <button type="button" class="demo-badge" onclick="fillDemo('bendahara@nexvo.com')">Bendahara</button>
             <button type="button" class="demo-badge" onclick="fillDemo('koordiv@nexvo.com')">Koordiv</button>
+            <button type="button" class="demo-badge" onclick="fillDemo('anggota@nexvo.com')">Anggota</button>
             <button type="button" class="demo-badge" onclick="fillDemo('admin@nexvo.com')">Admin</button>
         </div>
     </div>

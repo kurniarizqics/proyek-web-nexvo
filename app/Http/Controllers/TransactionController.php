@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ActivityLog;
 use App\Models\Transaction;
 use App\Models\Category;
 use App\Models\Proposal;
@@ -23,7 +24,10 @@ class TransactionController extends Controller
 
         $runningBalance = 0;
         foreach ($allTransactions as $trx) {
-            if ($trx->type === 'income') {
+            $trxType = $trx->category?->type ?? 'expense';
+            $trx->resolved_type = $trxType;
+
+            if ($trxType === 'income') {
                 $runningBalance += $trx->amount;
             } else {
                 $runningBalance -= $trx->amount;
@@ -33,6 +37,7 @@ class TransactionController extends Controller
 
         // Daftar periode unik (YYYY-MM) dari data yang ada + bulan saat ini
         $availablePeriods = $allTransactions
+            ->toBase()
             ->map(fn($t) => Carbon::parse($t->transaction_date)->format('Y-m'))
             ->push(now()->format('Y-m'))
             ->unique()
@@ -47,8 +52,8 @@ class TransactionController extends Controller
             return Carbon::parse($trx->transaction_date)->format('Y-m') === $selectedPeriod;
         });
 
-        $totalIncome = $filtered->where('type', 'income')->sum('amount');
-        $totalExpense = $filtered->where('type', 'expense')->sum('amount');
+        $totalIncome = $filtered->where('resolved_type', 'income')->sum('amount');
+        $totalExpense = $filtered->where('resolved_type', 'expense')->sum('amount');
         $endingBalance = $runningBalance;
 
         // Urutkan terbaru di atas untuk ditampilkan di tabel
@@ -74,17 +79,19 @@ class TransactionController extends Controller
     public function store(Request $request)
     {
         if (Auth::user()->role !== 'bendahara') {
+            ActivityLog::record('Percobaan mencatat transaksi kas tanpa wewenang', 'failed');
             return back()->with('error', 'Hanya Bendahara yang memiliki akses mencatat transaksi kas.');
         }
 
         $request->validate([
             'transaction_date' => 'required|date',
-            'type' => 'required|in:income,expense',
             'category_id' => 'required|exists:categories,id',
             'amount' => 'required|numeric|min:1',
             'description' => 'required|string|max:500',
             'proof' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:5120',
         ]);
+
+        $category = Category::findOrFail($request->category_id);
 
         $proofPath = null;
         if ($request->hasFile('proof')) {
@@ -93,14 +100,16 @@ class TransactionController extends Controller
 
         Transaction::create([
             'user_id' => Auth::id(),
-            'category_id' => $request->category_id,
+            'category_id' => $category->id,
             'proposal_id' => $request->proposal_id ?: null,
-            'type' => $request->type,
             'amount' => $request->amount,
             'transaction_date' => $request->transaction_date,
             'description' => $request->description,
             'proof_path' => $proofPath,
         ]);
+
+        $jenisLabel = $category->type === 'income' ? 'Kas Masuk' : 'Kas Keluar';
+        ActivityLog::record("Mencatat transaksi {$jenisLabel}: {$request->description}", 'success');
 
         return redirect()->route('transactions.index')
             ->with('success', 'Transaksi kas baru berhasil dicatat ke dalam Buku Kas Organisasi.');

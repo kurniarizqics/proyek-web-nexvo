@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ActivityLog;
 use App\Models\Proposal;
 use App\Models\Category;
 use Illuminate\Http\Request;
@@ -83,7 +84,7 @@ class ProposalController extends Controller
             default => 'pending_ketua',
         };
 
-        Proposal::create([
+        $proposal = Proposal::create([
             'user_id' => Auth::id(),
             'title' => $request->title,
             'amount' => $request->amount,
@@ -91,6 +92,8 @@ class ProposalController extends Controller
             'document_path' => $documentPath,
             'status' => $initialStatus,
         ]);
+
+        ActivityLog::record('Membuat pengajuan dana: ' . $proposal->title, 'success');
 
         return redirect()->route('proposals.index', ['tab' => 'my'])
             ->with('success', 'Pengajuan anggaran berhasil dikirim dan masuk ke jalur persetujuan.');
@@ -101,6 +104,7 @@ class ProposalController extends Controller
         $user = Auth::user();
 
         if ($proposal->user_id === $user->id) {
+            ActivityLog::record('Percobaan validasi pengajuan milik sendiri', 'failed');
             return back()->with('error', 'Anda tidak dapat memvalidasi pengajuan Anda sendiri.');
         }
 
@@ -116,6 +120,8 @@ class ProposalController extends Controller
                 'rejection_reason' => $request->rejection_reason,
                 'review_note' => $request->review_note,
             ]);
+
+            ActivityLog::record('Menolak pengajuan dana: ' . $proposal->title, 'success');
 
             return back()->with([
                 'success_title' => 'Pengajuan dana telah ditolak.',
@@ -133,6 +139,7 @@ class ProposalController extends Controller
         } elseif ($proposal->status === 'pending_bendahara' && $user->role === 'bendahara') {
             $nextStatus = 'approved';
         } else {
+            ActivityLog::record('Percobaan menyetujui pengajuan dana tanpa wewenang', 'failed');
             return back()->with('error', 'Anda tidak memiliki wewenang pada tahap validasi saat ini.');
         }
 
@@ -140,6 +147,8 @@ class ProposalController extends Controller
             'status' => $nextStatus,
             'review_note' => $request->review_note,
         ]);
+
+        ActivityLog::record('Menyetujui pengajuan dana: ' . $proposal->title, 'success');
 
         return back()->with([
             'success_title' => 'Pengajuan dana berhasil disetujui.',
@@ -152,6 +161,7 @@ class ProposalController extends Controller
         $user = Auth::user();
 
         if ($proposal->user_id !== $user->id) {
+            ActivityLog::record('Percobaan membatalkan pengajuan milik pengguna lain', 'failed');
             return back()->with('error', 'Anda tidak memiliki akses untuk membatalkan pengajuan ini.');
         }
 
@@ -159,11 +169,15 @@ class ProposalController extends Controller
             return back()->with('error', 'Pengajuan yang sudah diproses tidak dapat dibatalkan.');
         }
 
+        $title = $proposal->title;
+
         if (!empty($proposal->document_path) && Storage::disk('public')->exists($proposal->document_path)) {
             Storage::disk('public')->delete($proposal->document_path);
         }
 
         $proposal->delete();
+
+        ActivityLog::record('Membatalkan pengajuan dana: ' . $title, 'success');
 
         return redirect()->route('proposals.index', ['tab' => 'my'])
             ->with([

@@ -104,6 +104,16 @@
             color: var(--navy-dark);
         }
 
+        /* Aksen Merah untuk Tombol Keluar */
+        .nav-item-logout {
+            color: #DC2626;
+        }
+
+        .nav-item-logout:hover {
+            background-color: #FEF2F2;
+            color: #B91C1C;
+        }
+
         /* Main Menu aktif tunggal (contoh: Dashboard) */
         .nav-item-main.active {
             background-color: var(--active-bg);
@@ -302,6 +312,46 @@
             background-color: #B4C6D6;
             color: var(--navy-dark);
         }
+
+        /* Modal Konfirmasi Logout */
+        .logout-modal-card {
+            background-color: #F7F2EC;
+            border: none;
+            border-radius: 16px;
+            padding: 28px 28px 24px 28px;
+        }
+
+        .btn-logout-cancel {
+            background-color: #FFFFFF;
+            color: #2B394A;
+            border: 1px solid #E5E7EB;
+            border-radius: 10px;
+            padding: 11px 16px;
+            font-size: 13.5px;
+            font-weight: 600;
+            transition: background-color 0.15s ease;
+        }
+
+        .btn-logout-cancel:hover {
+            background-color: #F8FAFC;
+            color: #1E293B;
+        }
+
+        .btn-logout-confirm {
+            background-color: #2B394A;
+            color: #FFFFFF;
+            border: none;
+            border-radius: 10px;
+            padding: 11px 16px;
+            font-size: 13.5px;
+            font-weight: 600;
+            transition: background-color 0.15s ease;
+        }
+
+        .btn-logout-confirm:hover {
+            background-color: #1F2A37;
+            color: #FFFFFF;
+        }
     </style>
 </head>
 <body>
@@ -312,7 +362,9 @@
     $isApprovalHistory = request()->routeIs('proposals.index') && request()->query('tab') === 'history';
     $isProposalGroup = request()->routeIs('proposals.create') || $isMyProposals;
     $isApprovalGroup = $isWaitingApproval || $isApprovalHistory;
-    $isTransactionMenu = request()->routeIs('transactions.*');
+    $isTransactionMenu = request()->routeIs('transactions.*') || request()->routeIs('reports.*');
+    $isAuditMenu = request()->routeIs('audit-logs.*');
+    $isProfileMenu = request()->routeIs('profile.*');
 
     // Hitung antrean validasi khusus sesuai wewenang role yang login (tidak menghitung punya sendiri)
     $role = Auth::user()->role;
@@ -335,6 +387,7 @@
 
 <!-- Sidebar Kiri -->
 <aside class="sidebar" id="sidebar">
+    <!-- Bagian Atas Sidebar: Brand & Menu Utama -->
     <div>
         <div class="brand-box">
             <div class="brand-logo-circle">
@@ -404,7 +457,7 @@
 
         <!-- 4. Transaksi & Bukti Kas (Accordion Collapsible) -->
         <div class="nav-item-main {{ $isTransactionMenu ? 'parent-active' : '' }}" data-bs-toggle="collapse" data-bs-target="#menuTransaksi" aria-expanded="{{ $isTransactionMenu ? 'true' : 'false' }}">
-            <span><i class="bi bi-receipt me-2"></i> Transaksi & Bukti Kas</span>
+            <span><i class="bi bi-receipt me-2"></i> Transaksi &amp; Bukti Kas</span>
             <i class="bi bi-chevron-down small chevron-icon"></i>
         </div>
         <div class="collapse {{ $isTransactionMenu ? 'show' : '' }}" id="menuTransaksi">
@@ -415,44 +468,49 @@
                     </a>
                 </li>
                 <li>
-                    <a href="{{ route('transactions.create') }}" class="{{ request()->routeIs('transactions.create') ? 'active-sub' : '' }}">
-                        Catat Transaksi
+                    <a href="{{ route('reports.index') }}" class="{{ request()->routeIs('reports.*') ? 'active-sub' : '' }}">
+                        Laporan Keuangan
                     </a>
                 </li>
             </ul>
         </div>
 
         <!-- 5. Audit Log (Accordion Collapsible) -->
-        <div class="nav-item-main" data-bs-toggle="collapse" data-bs-target="#menuAudit" aria-expanded="false">
+        <div class="nav-item-main {{ $isAuditMenu ? 'parent-active' : '' }}" data-bs-toggle="collapse" data-bs-target="#menuAudit" aria-expanded="{{ $isAuditMenu ? 'true' : 'false' }}">
             <span><i class="bi bi-clock-history me-2"></i> Audit Log</span>
             <i class="bi bi-chevron-down small chevron-icon"></i>
         </div>
-        <div class="collapse" id="menuAudit">
+        <div class="collapse {{ $isAuditMenu ? 'show' : '' }}" id="menuAudit">
             <ul class="nav-sub-list">
-                <li><a href="#">Aktivitas Pengguna</a></li>
+                <li>
+                    <a href="{{ route('audit-logs.index') }}" class="{{ $isAuditMenu ? 'active-sub' : '' }}">
+                        Aktivitas Pengguna
+                    </a>
+                </li>
             </ul>
         </div>
     </div>
 
     <!-- Bagian Bawah Sidebar: Pengaturan & Keluar -->
-    <div class="pt-3">
+    <div class="mt-auto pt-3">
         <div class="menu-label">Pengaturan</div>
-        <div class="nav-item-main" data-bs-toggle="collapse" data-bs-target="#menuProfil" aria-expanded="false">
+        <div class="nav-item-main {{ $isProfileMenu ? 'parent-active' : '' }}" data-bs-toggle="collapse" data-bs-target="#menuProfil" aria-expanded="{{ $isProfileMenu ? 'true' : 'false' }}">
             <span><i class="bi bi-person-circle me-2"></i> Profil Saya</span>
             <i class="bi bi-chevron-down small chevron-icon"></i>
         </div>
-        <div class="collapse" id="menuProfil">
+        <div class="collapse {{ $isProfileMenu ? 'show' : '' }}" id="menuProfil">
             <ul class="nav-sub-list">
-                <li><a href="#">Pengaturan Akun</a></li>
+                <li>
+                    <a href="{{ route('profile.index') }}" class="{{ $isProfileMenu ? 'active-sub' : '' }}">
+                        Pengaturan Akun
+                    </a>
+                </li>
             </ul>
         </div>
 
-        <form action="{{ route('logout') }}" method="POST" class="mt-1">
-            @csrf
-            <button type="submit" class="nav-item-main w-100 border-0 bg-transparent text-start">
-                <span><i class="bi bi-box-arrow-left me-2"></i> Keluar</span>
-            </button>
-        </form>
+        <button type="button" class="nav-item-main nav-item-logout w-100 border-0 bg-transparent text-start mt-1" data-bs-toggle="modal" data-bs-target="#logoutConfirmModal">
+            <span><i class="bi bi-box-arrow-left me-2"></i> Keluar</span>
+        </button>
     </div>
 </aside>
 
@@ -479,15 +537,19 @@
                 <i class="bi bi-chat-dots"></i>
                 <span class="notif-dot"></span>
             </div>
-            <div class="d-flex align-items-center gap-2 ms-2">
-                <div class="rounded-circle bg-secondary text-white d-flex align-items-center justify-content-center fw-bold" style="width: 40px; height: 40px;">
-                    {{ strtoupper(substr(Auth::user()->name, 0, 1)) }}
-                </div>
+            <a href="{{ route('profile.index') }}" class="d-flex align-items-center gap-2 ms-2 text-decoration-none text-dark">
+                @if(Auth::user()->avatar_url)
+                    <img src="{{ Auth::user()->avatar_url }}" alt="Avatar" class="rounded-circle object-fit-cover border" style="width: 40px; height: 40px;">
+                @else
+                    <div class="rounded-circle bg-secondary text-white d-flex align-items-center justify-content-center fw-bold" style="width: 40px; height: 40px;">
+                        {{ strtoupper(substr(Auth::user()->name, 0, 1)) }}
+                    </div>
+                @endif
                 <div style="line-height: 1.2;">
                     <div class="fw-bold" style="font-size: 14px;">{{ Auth::user()->name }}</div>
                     <div class="text-muted" style="font-size: 12px;">{{ ucfirst(Auth::user()->role) }}</div>
                 </div>
-            </div>
+            </a>
         </div>
     </header>
 
@@ -502,6 +564,32 @@
 
         @yield('content')
     </main>
+</div>
+
+<!-- Modal Konfirmasi Keluar dari Akun -->
+<div class="modal fade" id="logoutConfirmModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 390px;">
+        <div class="modal-content logout-modal-card shadow">
+            <h5 class="fw-bold mb-2" style="color: #2B394A; font-size: 19px;">Keluar dari akun?</h5>
+            <p class="mb-4" style="color: #334155; font-size: 14px;">Anda yakin ingin mengakhiri sesi ini?</p>
+
+            <form action="{{ route('logout') }}" method="POST">
+                @csrf
+                <div class="row g-2">
+                    <div class="col-6">
+                        <button type="button" class="btn-logout-cancel w-100" data-bs-dismiss="modal">
+                            Batal
+                        </button>
+                    </div>
+                    <div class="col-6">
+                        <button type="submit" class="btn-logout-confirm w-100">
+                            Keluar
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
