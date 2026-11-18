@@ -13,6 +13,7 @@ class Transaction extends Model
         'transaction_date',
         'description',
         'proposal_id',
+        'proof_path',
     ];
 
     public function category()
