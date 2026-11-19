@@ -14,8 +14,15 @@ class Transaction extends Model
         'description',
         'proposal_id',
         'proof_path',
+        'voided_at',
+        'void_reason',
     ];
-
+    
+    protected $casts = [
+        'transaction_date' => 'date',
+        'voided_at' => 'datetime',
+    ];
+    
     public function category()
     {
         return $this->belongsTo(Category::class);

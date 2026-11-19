@@ -11,7 +11,9 @@ class ReportController extends Controller
 {
     private function getReportData(Request $request)
     {
+        // Hanya ambil transaksi aktif (bukan yang sudah di-Void)
         $allTransactions = Transaction::with(['category', 'user'])
+            ->whereNull('voided_at')
             ->orderBy('transaction_date', 'asc')
             ->orderBy('id', 'asc')
             ->get();
@@ -25,7 +27,7 @@ class ReportController extends Controller
         $endDate = $request->query('end_date', $latestDate->copy()->endOfMonth()->format('Y-m-d'));
         $typeFilter = $request->query('type', 'all'); // all | income | expense
 
-        // Hitung saldo berjalan kronologis untuk seluruh transaksi
+        // Hitung saldo berjalan kronologis untuk seluruh transaksi aktif
         $runningBalance = 0;
         $openingBalance = 0;
 

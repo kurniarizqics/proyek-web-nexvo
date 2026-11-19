@@ -18,6 +18,8 @@ class User extends Authenticatable
         'role',
         'division',
         'avatar',
+        'is_active',
+        'division_id',
     ];
 
     protected $hidden = [
@@ -30,6 +32,7 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'is_active' => 'boolean',
         ];
     }
 
@@ -41,6 +44,11 @@ class User extends Authenticatable
     public function getAvatarUrlAttribute(): ?string
     {
         return $this->avatar ? asset('storage/' . $this->avatar) : null;
+    }
+
+    public function divisionRelation()
+    {
+        return $this->belongsTo(Division::class, 'division_id');
     }
 
     public function proposals()

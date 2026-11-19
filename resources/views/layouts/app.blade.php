@@ -114,7 +114,7 @@
             color: #B91C1C;
         }
 
-        /* Main Menu aktif tunggal (contoh: Dashboard) */
+        /* Main Menu aktif tunggal */
         .nav-item-main.active {
             background-color: var(--active-bg);
             color: var(--navy-dark);
@@ -165,7 +165,7 @@
             background-color: #F8FAFC;
         }
 
-        /* Sub Menu Terpilih (Kotak biru keabuan + garis aksen vertikal di kiri) */
+        /* Sub Menu Terpilih */
         .nav-sub-list li a.active-sub {
             background-color: var(--active-bg);
             color: var(--navy-dark);
@@ -357,18 +357,29 @@
 <body>
 
 @php
+    $role = Auth::user()->role;
+    $isAdminRole = ($role === 'admin');
+    $isBendaharaRole = ($role === 'bendahara');
+
     $isMyProposals = request()->routeIs('proposals.index') && request()->query('tab', 'my') === 'my';
-    $isWaitingApproval = request()->routeIs('proposals.index') && request()->query('tab') === 'approvals';
+    $isPenyaluranSection = request()->query('section') === 'penyaluran';
+    $isAntreanPencairan = request()->routeIs('proposals.index') && request()->query('tab') === 'approvals' && $isPenyaluranSection;
+    $isValidasiBukti = request()->routeIs('transactions.index') && $isPenyaluranSection;
+    $isPenyaluranGroup = $isAntreanPencairan || $isValidasiBukti;
+
+    $isWaitingApproval = request()->routeIs('proposals.index') && request()->query('tab') === 'approvals' && !$isPenyaluranSection;
     $isApprovalHistory = request()->routeIs('proposals.index') && request()->query('tab') === 'history';
     $isProposalGroup = request()->routeIs('proposals.create') || $isMyProposals;
     $isApprovalGroup = $isWaitingApproval || $isApprovalHistory;
-    $isTransactionMenu = request()->routeIs('transactions.*') || request()->routeIs('reports.*');
+
+    $isTransactionMenu = (request()->routeIs('transactions.*') && !$isValidasiBukti) || request()->routeIs('reports.*');
     $isAuditMenu = request()->routeIs('audit-logs.*');
     $isProfileMenu = request()->routeIs('profile.*');
 
-    // Hitung antrean validasi khusus sesuai wewenang role yang login (tidak menghitung punya sendiri)
-    $role = Auth::user()->role;
+    // Hitung antrean validasi khusus sesuai wewenang role operasional keuangan
     $pendingCount = 0;
+    $bendaharaApprovalCount = 0;
+
     if ($role === 'koordiv') {
         $pendingCount = \App\Models\Proposal::where('status', 'pending_koordiv')
             ->where('user_id', '!=', Auth::id())
@@ -379,8 +390,21 @@
             ->where('user_id', '!=', Auth::id())
             ->count();
     } elseif ($role === 'bendahara') {
-        $pendingCount = \App\Models\Proposal::where('status', 'pending_bendahara')
+        // 1. Badge Penyaluran Dana -> Antrean Pencairan (siap dicairkan)
+        $pendingCount = \App\Models\Proposal::where('user_id', '!=', Auth::id())
+            ->where(function ($q) {
+                $q->where('status', 'pending_disbursement')
+                  ->orWhere(function ($sub) {
+                      $sub->where('status', 'pending_bendahara')
+                          ->whereHas('user', fn($u) => $u->whereRaw('LOWER(role) != ?', ['ketua']));
+                  });
+            })
+            ->count();
+
+        // 2. Badge Persetujuan Dana -> Menunggu Validasi (khusus pengajuan dari Ketua)
+        $bendaharaApprovalCount = \App\Models\Proposal::where('status', 'pending_bendahara')
             ->where('user_id', '!=', Auth::id())
+            ->whereHas('user', fn($q) => $q->whereRaw('LOWER(role) = ?', ['ketua']))
             ->count();
     }
 @endphp
@@ -404,91 +428,153 @@
         <div class="menu-label">Menu Utama</div>
 
         <!-- 1. Dashboard -->
-        <a href="{{ route('dashboard', Auth::user()->role) }}" class="nav-item-main {{ request()->routeIs('dashboard') ? 'active' : '' }}">
+        <a href="{{ route('dashboard', $role) }}" class="nav-item-main {{ request()->routeIs('dashboard') ? 'active' : '' }}">
             <span><i class="bi bi-grid-1x2 me-2"></i> Dashboard</span>
         </a>
 
-        <!-- 2. Pengajuan Dana (Accordion Collapsible) -->
-        <div class="nav-item-main {{ $isProposalGroup ? 'parent-active' : '' }}" data-bs-toggle="collapse" data-bs-target="#menuPengajuan" aria-expanded="{{ $isProposalGroup ? 'true' : 'false' }}">
-            <span><i class="bi bi-plus-circle me-2"></i> Pengajuan Dana</span>
-            <i class="bi bi-chevron-down small chevron-icon"></i>
-        </div>
-        <div class="collapse {{ $isProposalGroup ? 'show' : '' }}" id="menuPengajuan">
-            <ul class="nav-sub-list">
-                <li>
-                    <a href="{{ route('proposals.create') }}" class="{{ request()->routeIs('proposals.create') ? 'active-sub' : '' }}">
-                        Buat Pengajuan
-                    </a>
-                </li>
-                <li>
-                    <a href="{{ route('proposals.index', ['tab' => 'my']) }}" class="{{ $isMyProposals ? 'active-sub' : '' }}">
-                        Riwayat Pengajuanku
-                    </a>
-                </li>
-            </ul>
-        </div>
+        @if($isAdminRole)
+            <!-- ================================================================= -->
+            <!-- SIDEBAR KHUSUS ADMIN (MANAJEMEN DATA MASTER & SISTEM)             -->
+            <!-- ================================================================= -->
+            <a href="{{ route('admin.users.index') }}" class="nav-item-main {{ request()->routeIs('admin.users.*') ? 'active' : '' }}">
+                <span><i class="bi bi-people me-2"></i> Manajemen Pengguna</span>
+            </a>
 
-        <!-- 3. Persetujuan Dana (Untuk Koordiv, Ketua, Bendahara, Admin) -->
-        @if(in_array(Auth::user()->role, ['koordiv', 'ketua', 'bendahara', 'admin']))
-        <div class="nav-item-main {{ $isApprovalGroup ? 'parent-active' : '' }}" data-bs-toggle="collapse" data-bs-target="#menuPersetujuan" aria-expanded="{{ $isApprovalGroup ? 'true' : 'false' }}">
-            <span><i class="bi bi-check-circle me-2"></i> Persetujuan Dana</span>
-            <div class="d-flex align-items-center gap-2">
-                @if($pendingCount > 0)
-                    <span class="badge-count">{{ $pendingCount }}</span>
-                @endif
+            <a href="{{ route('admin.divisions.index') }}" class="nav-item-main {{ request()->routeIs('admin.divisions.*') ? 'active' : '' }}">
+                <span><i class="bi bi-diagram-3 me-2"></i> Manajemen Divisi</span>
+            </a>
+
+            <div class="nav-item-main {{ $isAuditMenu ? 'parent-active' : '' }}" data-bs-toggle="collapse" data-bs-target="#menuAudit" aria-expanded="{{ $isAuditMenu ? 'true' : 'false' }}">
+                <span><i class="bi bi-clock-history me-2"></i> Audit Log</span>
                 <i class="bi bi-chevron-down small chevron-icon"></i>
             </div>
-        </div>
-        <div class="collapse {{ $isApprovalGroup ? 'show' : '' }}" id="menuPersetujuan">
-            <ul class="nav-sub-list">
-                <li>
-                    <a href="{{ route('proposals.index', ['tab' => 'approvals']) }}" class="{{ $isWaitingApproval ? 'active-sub' : '' }}">
-                        Menunggu Validasi
-                    </a>
-                </li>
-                <li>
-                    <a href="{{ route('proposals.index', ['tab' => 'history']) }}" class="{{ $isApprovalHistory ? 'active-sub' : '' }}">
-                        Riwayat Persetujuan
-                    </a>
-                </li>
-            </ul>
-        </div>
+            <div class="collapse {{ $isAuditMenu ? 'show' : '' }}" id="menuAudit">
+                <ul class="nav-sub-list">
+                    <li>
+                        <a href="{{ route('audit-logs.index') }}" class="{{ $isAuditMenu ? 'active-sub' : '' }}">
+                            Aktivitas Pengguna
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        @else
+            <!-- ================================================================= -->
+            <!-- SIDEBAR OPERASIONAL KEUANGAN (ANGGOTA, KOORDIV, KETUA, BENDAHARA) -->
+            <!-- ================================================================= -->
+
+            <!-- 2. Pengajuan Dana -->
+            <div class="nav-item-main {{ $isProposalGroup ? 'parent-active' : '' }}" data-bs-toggle="collapse" data-bs-target="#menuPengajuan" aria-expanded="{{ $isProposalGroup ? 'true' : 'false' }}">
+                <span><i class="bi bi-plus-circle me-2"></i> Pengajuan Dana</span>
+                <i class="bi bi-chevron-down small chevron-icon"></i>
+            </div>
+            <div class="collapse {{ $isProposalGroup ? 'show' : '' }}" id="menuPengajuan">
+                <ul class="nav-sub-list">
+                    <li>
+                        <a href="{{ route('proposals.create') }}" class="{{ request()->routeIs('proposals.create') ? 'active-sub' : '' }}">
+                            Buat Pengajuan
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{{ route('proposals.index', ['tab' => 'my']) }}" class="{{ $isMyProposals ? 'active-sub' : '' }}">
+                            Riwayat Pengajuanku
+                        </a>
+                    </li>
+                </ul>
+            </div>
+
+            <!-- 2b. Penyaluran Dana (Khusus Bendahara) -->
+            @if($isBendaharaRole)
+            <div class="nav-item-main {{ $isPenyaluranGroup ? 'parent-active' : '' }}" data-bs-toggle="collapse" data-bs-target="#menuPenyaluran" aria-expanded="{{ $isPenyaluranGroup ? 'true' : 'false' }}">
+                <span><i class="bi bi-plus-circle me-2"></i> Penyaluran Dana</span>
+                <div class="d-flex align-items-center gap-2">
+                    @if($pendingCount > 0)
+                        <span class="badge-count">{{ $pendingCount }}</span>
+                    @endif
+                    <i class="bi bi-chevron-down small chevron-icon"></i>
+                </div>
+            </div>
+            <div class="collapse {{ $isPenyaluranGroup ? 'show' : '' }}" id="menuPenyaluran">
+                <ul class="nav-sub-list">
+                    <li>
+                        <a href="{{ route('proposals.index', ['tab' => 'approvals', 'section' => 'penyaluran']) }}" class="{{ $isAntreanPencairan ? 'active-sub' : '' }}">
+                            Antrean Pencairan
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{{ route('transactions.index', ['section' => 'penyaluran']) }}" class="{{ $isValidasiBukti ? 'active-sub' : '' }}">
+                            Validasi Bukti
+                        </a>
+                    </li>
+                </ul>
+            </div>
+            @endif
+
+            <!-- 3. Persetujuan Dana (Untuk Koordiv, Ketua, Bendahara) -->
+            @if(in_array($role, ['koordiv', 'ketua', 'bendahara']))
+            <div class="nav-item-main {{ $isApprovalGroup ? 'parent-active' : '' }}" data-bs-toggle="collapse" data-bs-target="#menuPersetujuan" aria-expanded="{{ $isApprovalGroup ? 'true' : 'false' }}">
+                <span><i class="bi bi-check-circle me-2"></i> Persetujuan Dana</span>
+                <div class="d-flex align-items-center gap-2">
+                    @if(!$isBendaharaRole && $pendingCount > 0)
+                        <span class="badge-count">{{ $pendingCount }}</span>
+                    @elseif($isBendaharaRole && $bendaharaApprovalCount > 0)
+                        <span class="badge-count">{{ $bendaharaApprovalCount }}</span>
+                    @endif
+                    <i class="bi bi-chevron-down small chevron-icon"></i>
+                </div>
+            </div>
+            <div class="collapse {{ $isApprovalGroup ? 'show' : '' }}" id="menuPersetujuan">
+                <ul class="nav-sub-list">
+                    <li>
+                        <a href="{{ route('proposals.index', ['tab' => 'approvals']) }}" class="{{ $isWaitingApproval ? 'active-sub' : '' }}">
+                            Menunggu Validasi
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{{ route('proposals.index', ['tab' => 'history']) }}" class="{{ $isApprovalHistory ? 'active-sub' : '' }}">
+                            Riwayat Persetujuan
+                        </a>
+                    </li>
+                </ul>
+            </div>
+            @endif
+
+            <!-- 4. Transaksi & Bukti Kas -->
+            <div class="nav-item-main {{ $isTransactionMenu ? 'parent-active' : '' }}" data-bs-toggle="collapse" data-bs-target="#menuTransaksi" aria-expanded="{{ $isTransactionMenu ? 'true' : 'false' }}">
+                <span>
+                    <i class="bi bi-receipt me-2"></i> Transaksi &amp; Bukti Kas
+                </span>
+                <i class="bi bi-chevron-down small chevron-icon"></i>
+            </div>
+            <div class="collapse {{ $isTransactionMenu ? 'show' : '' }}" id="menuTransaksi">
+                <ul class="nav-sub-list">
+                    <li>
+                        <a href="{{ route('transactions.index') }}" class="{{ (request()->routeIs('transactions.index') && !$isValidasiBukti) ? 'active-sub' : '' }}">
+                            Buku Kas
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{{ route('reports.index') }}" class="{{ request()->routeIs('reports.*') ? 'active-sub' : '' }}">
+                            Laporan Keuangan
+                        </a>
+                    </li>
+                </ul>
+            </div>
+
+            <!-- 5. Audit Log -->
+            <div class="nav-item-main {{ $isAuditMenu ? 'parent-active' : '' }}" data-bs-toggle="collapse" data-bs-target="#menuAudit" aria-expanded="{{ $isAuditMenu ? 'true' : 'false' }}">
+                <span><i class="bi bi-clock-history me-2"></i> Audit Log</span>
+                <i class="bi bi-chevron-down small chevron-icon"></i>
+            </div>
+            <div class="collapse {{ $isAuditMenu ? 'show' : '' }}" id="menuAudit">
+                <ul class="nav-sub-list">
+                    <li>
+                        <a href="{{ route('audit-logs.index') }}" class="{{ $isAuditMenu ? 'active-sub' : '' }}">
+                            Aktivitas Pengguna
+                        </a>
+                    </li>
+                </ul>
+            </div>
         @endif
-
-        <!-- 4. Transaksi & Bukti Kas (Accordion Collapsible) -->
-        <div class="nav-item-main {{ $isTransactionMenu ? 'parent-active' : '' }}" data-bs-toggle="collapse" data-bs-target="#menuTransaksi" aria-expanded="{{ $isTransactionMenu ? 'true' : 'false' }}">
-            <span><i class="bi bi-receipt me-2"></i> Transaksi &amp; Bukti Kas</span>
-            <i class="bi bi-chevron-down small chevron-icon"></i>
-        </div>
-        <div class="collapse {{ $isTransactionMenu ? 'show' : '' }}" id="menuTransaksi">
-            <ul class="nav-sub-list">
-                <li>
-                    <a href="{{ route('transactions.index') }}" class="{{ request()->routeIs('transactions.index') ? 'active-sub' : '' }}">
-                        Buku Kas
-                    </a>
-                </li>
-                <li>
-                    <a href="{{ route('reports.index') }}" class="{{ request()->routeIs('reports.*') ? 'active-sub' : '' }}">
-                        Laporan Keuangan
-                    </a>
-                </li>
-            </ul>
-        </div>
-
-        <!-- 5. Audit Log (Accordion Collapsible) -->
-        <div class="nav-item-main {{ $isAuditMenu ? 'parent-active' : '' }}" data-bs-toggle="collapse" data-bs-target="#menuAudit" aria-expanded="{{ $isAuditMenu ? 'true' : 'false' }}">
-            <span><i class="bi bi-clock-history me-2"></i> Audit Log</span>
-            <i class="bi bi-chevron-down small chevron-icon"></i>
-        </div>
-        <div class="collapse {{ $isAuditMenu ? 'show' : '' }}" id="menuAudit">
-            <ul class="nav-sub-list">
-                <li>
-                    <a href="{{ route('audit-logs.index') }}" class="{{ $isAuditMenu ? 'active-sub' : '' }}">
-                        Aktivitas Pengguna
-                    </a>
-                </li>
-            </ul>
-        </div>
     </div>
 
     <!-- Bagian Bawah Sidebar: Pengaturan & Keluar -->
