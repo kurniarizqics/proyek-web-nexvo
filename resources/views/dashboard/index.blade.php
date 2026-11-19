@@ -1,6 +1,15 @@
 @extends('layouts.app')
 
 @section('content')
+@php
+    $balance = $balance ?? 0;
+    $totalIncome = $totalIncome ?? 0;
+    $totalExpense = $totalExpense ?? 0;
+    $pendingProposals = $pendingProposals ?? 0;
+    $recentPendingProposals = $recentPendingProposals ?? collect();
+    $recentTransactions = $recentTransactions ?? collect();
+@endphp
+
 <!-- Header Dashboard & Filter -->
 <div class="d-flex flex-wrap flex-lg-nowrap justify-content-between align-items-start align-items-lg-center mb-4 gap-3">
     <div>
@@ -113,14 +122,14 @@
                     @forelse($recentPendingProposals as $prop)
                     <div class="d-flex justify-content-between align-items-center p-2 px-3 rounded-3" style="background-color: #EFECE8;">
                         <div>
-                            <div class="fw-bold" style="font-size: 13px;">{{ $prop->user->name }}</div>
-                            <div class="text-muted" style="font-size: 11px;">{{ $prop->user->division ?? 'Divisi' }}</div>
+                            <div class="fw-bold" style="font-size: 13px;">{{ $prop->user?->name ?? 'Pengguna' }}</div>
+                            <div class="text-muted" style="font-size: 11px;">{{ $prop->user?->division ?? 'Divisi' }}</div>
                         </div>
                         <div class="text-end me-2">
                             <div class="fw-bold" style="font-size: 12.5px;">Rp {{ number_format($prop->amount, 0, ',', '.') }}</div>
                             <div class="text-muted" style="font-size: 10.5px;">{{ $prop->created_at->format('d M Y') }}</div>
                         </div>
-                        <a href="{{ route('proposals.index') }}" class="btn-nexvo-dark py-1 px-3" style="font-size: 11.5px;">Review</a>
+                        <a href="{{ route('proposals.index', ['tab' => Auth::user()->role === 'anggota' ? 'my' : 'approvals']) }}" class="btn-nexvo-dark py-1 px-3" style="font-size: 11.5px;">Review</a>
                     </div>
                     @empty
                     <div class="text-center text-muted py-4" style="font-size: 12.5px;">
@@ -130,7 +139,7 @@
                 </div>
             </div>
 
-            <a href="{{ route('proposals.index') }}" class="btn-nexvo-soft w-100 text-center mt-3 py-2">
+            <a href="{{ route('proposals.index', ['tab' => Auth::user()->role === 'anggota' ? 'my' : 'approvals']) }}" class="btn-nexvo-soft w-100 text-center mt-3 py-2">
                 Lihat Semua Pengajuan
             </a>
         </div>
@@ -160,10 +169,10 @@
                             @forelse($recentTransactions as $trx)
                             <tr>
                                 <td class="py-2 text-muted">{{ \Carbon\Carbon::parse($trx->transaction_date)->format('d M Y') }}</td>
-                                <td class="py-2 fw-medium">{{ $trx->description ?? $trx->category->name }}</td>
-                                <td class="py-2" style="color: #607990;">{{ $trx->category->name }}</td>
+                                <td class="py-2 fw-medium">{{ $trx->description ?? ($trx->category?->name ?? '-') }}</td>
+                                <td class="py-2" style="color: #607990;">{{ $trx->category?->name ?? '-' }}</td>
                                 <td class="py-2 text-end fw-bold">
-                                    @if($trx->category->type === 'income')
+                                    @if(($trx->category?->type ?? 'expense') === 'income')
                                         +Rp {{ number_format($trx->amount, 0, ',', '.') }}
                                     @else
                                         -Rp {{ number_format($trx->amount, 0, ',', '.') }}
@@ -193,34 +202,22 @@
             <p class="text-muted mb-3" style="font-size: 12px;">Aktivitas terbaru organisasi.</p>
 
             <div class="d-flex flex-column gap-3">
+                @php
+                    $latestLogs = \App\Models\ActivityLog::latest()->take(4)->get();
+                @endphp
+                @forelse($latestLogs as $log)
                 <div class="d-flex align-items-start gap-2">
                     <span class="badge rounded-circle p-2" style="background-color: #DCE5EE; color: #243242;"><i class="bi bi-check2-circle"></i></span>
                     <div>
-                        <div class="fw-semibold" style="font-size: 12px;">Ketua menyetujui pengajuan dana.</div>
-                        <div class="text-muted" style="font-size: 10.5px;">Hari ini, 10:45 WIB</div>
+                        <div class="fw-semibold" style="font-size: 12px;">{{ $log->action }}</div>
+                        <div class="text-muted" style="font-size: 10.5px;">{{ $log->created_at->locale('id')->diffForHumans() }}, {{ $log->created_at->format('H:i') }} WIB</div>
                     </div>
                 </div>
-                <div class="d-flex align-items-start gap-2">
-                    <span class="badge rounded-circle p-2" style="background-color: #DCE5EE; color: #243242;"><i class="bi bi-plus-circle"></i></span>
-                    <div>
-                        <div class="fw-semibold" style="font-size: 12px;">Bendahara menambahkan transaksi pemasukan.</div>
-                        <div class="text-muted" style="font-size: 10.5px;">Hari ini, 09:20 WIB</div>
-                    </div>
+                @empty
+                <div class="text-center text-muted py-4" style="font-size: 12.5px;">
+                    Belum ada aktivitas terbaru tercatat.
                 </div>
-                <div class="d-flex align-items-start gap-2">
-                    <span class="badge rounded-circle p-2" style="background-color: #DCE5EE; color: #243242;"><i class="bi bi-cloud-upload"></i></span>
-                    <div>
-                        <div class="fw-semibold" style="font-size: 12px;">Anggota mengunggah bukti pembayaran.</div>
-                        <div class="text-muted" style="font-size: 10.5px;">Kemarin, 16:30 WIB</div>
-                    </div>
-                </div>
-                <div class="d-flex align-items-start gap-2">
-                    <span class="badge rounded-circle p-2" style="background-color: #EFECE8; color: #243242;"><i class="bi bi-file-earmark-text"></i></span>
-                    <div>
-                        <div class="fw-semibold" style="font-size: 12px;">Pengajuan dana Divisi Event diterima.</div>
-                        <div class="text-muted" style="font-size: 10.5px;">Kemarin, 08:15 WIB</div>
-                    </div>
-                </div>
+                @endforelse
             </div>
         </div>
     </div>
@@ -231,48 +228,50 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
     const ctx = document.getElementById('financialChart');
-    new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'],
-            datasets: [
-                {
-                    label: 'Pemasukan',
-                    data: [4, 6, 5, 7, 8, 9, 8.5, 9.5, 10, 11, 8.5, 0],
-                    backgroundColor: '#607990',
-                    borderRadius: 4,
-                    barPercentage: 0.65
-                },
-                {
-                    label: 'Pengeluaran',
-                    data: [2, 3, 4, 3.5, 4.5, 5, 5.5, 6, 6.5, 7, 3.25, 0],
-                    backgroundColor: '#243242',
-                    borderRadius: 4,
-                    barPercentage: 0.65
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { display: false }
+    if (ctx) {
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'],
+                datasets: [
+                    {
+                        label: 'Pemasukan',
+                        data: [4, 6, 5, 7, 8, 9, 8.5, 9.5, 10, 11, 8.5, 0],
+                        backgroundColor: '#607990',
+                        borderRadius: 4,
+                        barPercentage: 0.65
+                    },
+                    {
+                        label: 'Pengeluaran',
+                        data: [2, 3, 4, 3.5, 4.5, 5, 5.5, 6, 6.5, 7, 3.25, 0],
+                        backgroundColor: '#243242',
+                        borderRadius: 4,
+                        barPercentage: 0.65
+                    }
+                ]
             },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    max: 12,
-                    ticks: { stepSize: 4, font: { size: 11 } },
-                    grid: { color: '#F1F5F9' },
-                    border: { display: false }
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
                 },
-                x: {
-                    grid: { display: false },
-                    ticks: { font: { size: 11 } },
-                    border: { display: false }
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 12,
+                        ticks: { stepSize: 4, font: { size: 11 } },
+                        grid: { color: '#F1F5F9' },
+                        border: { display: false }
+                    },
+                    x: {
+                        grid: { display: false },
+                        ticks: { font: { size: 11 } },
+                        border: { display: false }
+                    }
                 }
             }
-        }
-    });
+        });
+    }
 </script>
 @endpush

@@ -6,10 +6,12 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ProposalController;
 use App\Http\Controllers\TransactionController;
 use App\Http\Controllers\ReportController;
-use App\Http\Controllers\AuditLogController;
+use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Admin\DivisionController as AdminDivisionController;
+use App\Models\Proposal;
+use App\Models\Transaction;
 
 Route::get('/', function () {
     return redirect()->route('login');
@@ -27,7 +29,7 @@ Route::post('/logout', [AuthController::class, 'logout'])
 
 // Rute Terproteksi Login
 Route::middleware('auth')->group(function () {
-    // Dashboard per Role (Mendukung route('dashboard') dengan atau tanpa parameter role)
+    // Dashboard per Role
     Route::get('/dashboard/{role?}', function (?string $role = null) {
         $user = Auth::user();
         $targetRole = $role ?? $user->role;
@@ -36,11 +38,58 @@ Route::middleware('auth')->group(function () {
             return redirect()->route('dashboard', $user->role);
         }
 
-        if (!view()->exists('dashboard.' . $targetRole)) {
-            abort(404);
+        // Khusus Administrator -> gunakan view dashboard/admin.blade.php
+        if ($targetRole === 'admin') {
+            return view('dashboard.admin');
         }
 
-        return view('dashboard.' . $targetRole);
+        // Hitung data keuangan real-time untuk dashboard operasional (Ketua, Bendahara, Koordiv, Anggota)
+        $allTransactions = Transaction::with('category')->whereNull('voided_at')->get();
+        $totalIncome = $allTransactions->filter(fn($t) => ($t->category?->type ?? 'expense') === 'income')->sum('amount');
+        $totalExpense = $allTransactions->filter(fn($t) => ($t->category?->type ?? 'expense') === 'expense')->sum('amount');
+        $balance = $totalIncome - $totalExpense;
+
+        // Hitung pengajuan pending sesuai wewenang role yang login
+        $pendingQuery = Proposal::with('user')->where('user_id', '!=', $user->id);
+
+        if ($user->role === 'koordiv') {
+            $pendingQuery->where('status', 'pending_koordiv')
+                ->whereHas('user', fn($q) => $q->where('division', $user->division)->where('role', 'anggota'));
+        } elseif ($user->role === 'ketua') {
+            $pendingQuery->where('status', 'pending_ketua');
+        } elseif ($user->role === 'bendahara') {
+            $pendingQuery->whereIn('status', ['pending_bendahara', 'pending_disbursement']);
+        } else {
+            // Untuk Anggota: tampilkan pengajuannya sendiri yang masih menunggu persetujuan
+            $pendingQuery = Proposal::with('user')
+                ->where('user_id', $user->id)
+                ->whereIn('status', ['pending_koordiv', 'pending_ketua', 'pending_bendahara', 'pending_disbursement']);
+        }
+
+        $pendingProposals = (clone $pendingQuery)->count();
+        $recentPendingProposals = $pendingQuery->latest()->take(4)->get();
+
+        $recentTransactions = Transaction::with('category')
+            ->whereNull('voided_at')
+            ->latest('transaction_date')
+            ->latest('id')
+            ->take(5)
+            ->get();
+
+        // Gunakan view spesifik role jika file ada dan tidak kosong, jika kosong fallback ke dashboard.index
+        $specificViewPath = resource_path('views/dashboard/' . $targetRole . '.blade.php');
+        $viewName = (file_exists($specificViewPath) && filesize($specificViewPath) > 0)
+            ? 'dashboard.' . $targetRole
+            : 'dashboard.index';
+
+        return view($viewName, compact(
+            'balance',
+            'totalIncome',
+            'totalExpense',
+            'pendingProposals',
+            'recentPendingProposals',
+            'recentTransactions'
+        ));
     })->name('dashboard');
 
     // Pengajuan & Persetujuan Dana (Anggota, Koordiv, Ketua, Bendahara)
@@ -54,14 +103,18 @@ Route::middleware('auth')->group(function () {
     // Transaksi & Bukti Kas
     Route::get('/transactions', [TransactionController::class, 'index'])->name('transactions.index');
     Route::post('/transactions', [TransactionController::class, 'store'])->name('transactions.store');
+    Route::put('/transactions/{transaction}', [TransactionController::class, 'update'])->name('transactions.update');
     Route::patch('/transactions/{transaction}/void', [TransactionController::class, 'void'])->name('transactions.void');
     Route::patch('/transactions/{proposal}/verify-realization', [TransactionController::class, 'verifyRealization'])->name('transactions.verifyRealization');
 
     // Laporan Keuangan
     Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
+    Route::get('/reports/preview-pdf', [ReportController::class, 'previewPdf'])->name('reports.previewPdf');
+    Route::get('/reports/export/pdf', [ReportController::class, 'exportPdf'])->name('reports.exportPdf');
+    Route::get('/reports/export/excel', [ReportController::class, 'exportExcel'])->name('reports.exportExcel');
 
     // Audit Log
-    Route::get('/audit-logs', [AuditLogController::class, 'index'])->name('audit-logs.index');
+    Route::get('/audit-logs', [ActivityLogController::class, 'index'])->name('audit-logs.index');
 
     // Profil Saya
     Route::get('/profile', [ProfileController::class, 'index'])->name('profile.index');
