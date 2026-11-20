@@ -50,8 +50,9 @@ class UserController extends Controller
 
         $users = $query->get();
         $divisions = Division::where('is_active', true)->orderBy('name')->get();
+        $hasKetua = User::where('role', 'ketua')->exists();
 
-        return view('admin.users.index', compact('users', 'divisions'));
+        return view('admin.users.index', compact('users', 'divisions', 'hasKetua'));
     }
 
     public function store(Request $request)

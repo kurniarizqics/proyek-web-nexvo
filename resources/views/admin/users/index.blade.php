@@ -274,7 +274,9 @@
                             <option value="anggota">Anggota</option>
                             <option value="koordiv">Koordinator Divisi</option>
                             <option value="bendahara">Bendahara</option>
-                            <option value="ketua">Ketua</option>
+                            @if(!$hasKetua)
+                                <option value="ketua">Ketua</option>
+                            @endif
                             <option value="admin">Administrator</option>
                         </select>
                     </div>
