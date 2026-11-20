@@ -280,11 +280,6 @@
                             <option value="admin">Administrator</option>
                         </select>
                     </div>
-                    <div class="mb-2">
-                        <label class="form-label fw-medium small">Divisi (Pilih atau Ketik Manual)</label>
-                        <input type="text" name="division_name" list="divisionOptionsList" class="form-control" placeholder="Ketik atau pilih nama divisi (opsional)">
-                        <div class="form-text" style="font-size: 11px;">Klik kolom untuk memilih divisi yang sudah ada, atau ketik nama divisi baru.</div>
-                    </div>
                 </div>
                 <div class="modal-footer border-0">
                     <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Batal</button>
