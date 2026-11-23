@@ -107,6 +107,9 @@ Route::middleware('auth')->group(function () {
     Route::patch('/transactions/{transaction}/void', [TransactionController::class, 'void'])->name('transactions.void');
     Route::patch('/transactions/{proposal}/verify-realization', [TransactionController::class, 'verifyRealization'])->name('transactions.verifyRealization');
 
+    // Validasi bukti realisasi (halaman Penyaluran Dana) -> method validateProof pada TransactionController
+    Route::post('/transactions/{proposal}/validate-proof', [TransactionController::class, 'validateProof'])->name('transactions.validateProof');
+
     // Laporan Keuangan
     Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
     Route::get('/reports/preview-pdf', [ReportController::class, 'previewPdf'])->name('reports.previewPdf');
