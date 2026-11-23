@@ -139,4 +139,4 @@ Route::middleware('auth')->group(function () {
         Route::patch('/divisions/{division}/toggle-status', [AdminDivisionController::class, 'toggleStatus'])->name('divisions.toggleStatus');
         Route::patch('/divisions/{division}/assign-members', [AdminDivisionController::class, 'assignMembers'])->name('divisions.assignMembers');
     });
-});
+}); 
