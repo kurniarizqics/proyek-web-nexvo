@@ -4,11 +4,17 @@ namespace App\Http\Controllers;
 
 use App\Models\ActivityLog;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class ActivityLogController extends Controller
 {
     public function index(Request $request)
     {
+        if (!in_array(Auth::user()->role, ['admin', 'ketua', 'bendahara'])) {
+            ActivityLog::record('Percobaan mengakses Audit Log tanpa wewenang', 'failed');
+            abort(403, 'Akses ditolak. Audit Log hanya dapat diakses oleh Administrator, Ketua, dan Bendahara.');
+        }
+
         $selectedPeriod = $request->query('period', 'all');
 
         $allLogs = ActivityLog::latest()->get();

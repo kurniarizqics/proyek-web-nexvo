@@ -15,6 +15,20 @@ class TransactionController extends Controller
 {
     public function index(Request $request)
     {
+        $role = Auth::user()->role;
+
+        // 1. Batasi akses Buku Kas hanya untuk Bendahara dan Ketua (Read-Only)
+        if (!in_array($role, ['bendahara', 'ketua'])) {
+            ActivityLog::record('Percobaan mengakses Buku Kas tanpa wewenang', 'failed');
+            abort(403, 'Akses ditolak. Hanya Bendahara dan Ketua yang dapat mengakses Buku Kas.');
+        }
+
+        // 2. Khusus tab/halaman Penyaluran & Validasi Bukti hanya untuk Bendahara
+        if ($request->query('section') === 'penyaluran' && $role !== 'bendahara') {
+            ActivityLog::record('Percobaan mengakses halaman Validasi Bukti tanpa wewenang', 'failed');
+            abort(403, 'Akses ditolak. Hanya Bendahara yang berwenang memvalidasi bukti realisasi.');
+        }
+
         $selectedPeriod = $request->query('period', 'all');
 
         $allTransactions = Transaction::with(['category', 'user', 'proposal'])
@@ -97,7 +111,8 @@ class TransactionController extends Controller
     public function validateProof(Request $request, Proposal $proposal)
     {
         if (Auth::user()->role !== 'bendahara') {
-            return back()->with('error', 'Hanya Bendahara yang berwenang memvalidasi bukti realisasi.');
+            ActivityLog::record('Percobaan memvalidasi bukti realisasi tanpa wewenang', 'failed');
+            abort(403, 'Hanya Bendahara yang berwenang memvalidasi bukti realisasi.');
         }
 
         $decision = $request->input('decision'); // 'approve' atau 'reject'
@@ -153,7 +168,7 @@ class TransactionController extends Controller
     {
         if (Auth::user()->role !== 'bendahara') {
             ActivityLog::record('Percobaan mencatat transaksi kas tanpa wewenang', 'failed');
-            return back()->with('error', 'Hanya Bendahara yang memiliki akses mencatat transaksi kas.');
+            abort(403, 'Hanya Bendahara yang memiliki akses mencatat transaksi kas.');
         }
 
         $request->validate([
@@ -193,7 +208,7 @@ class TransactionController extends Controller
     {
         if (Auth::user()->role !== 'bendahara') {
             ActivityLog::record('Percobaan mengubah transaksi kas tanpa wewenang', 'failed');
-            return back()->with('error', 'Hanya Bendahara yang memiliki akses mengubah transaksi kas.');
+            abort(403, 'Hanya Bendahara yang memiliki akses mengubah transaksi kas.');
         }
 
         if (!is_null($transaction->voided_at)) {
@@ -235,7 +250,7 @@ class TransactionController extends Controller
     {
         if (Auth::user()->role !== 'bendahara') {
             ActivityLog::record('Percobaan melakukan void transaksi kas tanpa wewenang', 'failed');
-            return back()->with('error', 'Hanya Bendahara yang memiliki akses melakukan Void transaksi kas.');
+            abort(403, 'Hanya Bendahara yang memiliki akses melakukan Void transaksi kas.');
         }
 
         if (!is_null($transaction->voided_at)) {
@@ -263,7 +278,7 @@ class TransactionController extends Controller
     {
         if (Auth::user()->role !== 'bendahara') {
             ActivityLog::record('Percobaan menghapus transaksi kas tanpa wewenang', 'failed');
-            return back()->with('error', 'Hanya Bendahara yang memiliki akses menghapus transaksi kas.');
+            abort(403, 'Hanya Bendahara yang memiliki akses menghapus transaksi kas.');
         }
 
         if ($transaction->proof_path && Storage::disk('public')->exists($transaction->proof_path)) {

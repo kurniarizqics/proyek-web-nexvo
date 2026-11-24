@@ -2,13 +2,23 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ActivityLog;
 use App\Models\Transaction;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
 
 class ReportController extends Controller
 {
+    private function authorizeReportAccess(): void
+    {
+        if (!in_array(Auth::user()->role, ['bendahara', 'ketua'])) {
+            ActivityLog::record('Percobaan mengakses Laporan Keuangan tanpa wewenang', 'failed');
+            abort(403, 'Akses ditolak. Laporan Keuangan hanya dapat diakses oleh Bendahara dan Ketua.');
+        }
+    }
+
     private function getReportData(Request $request)
     {
         // Hanya ambil transaksi aktif (bukan yang sudah di-Void)
@@ -73,12 +83,14 @@ class ReportController extends Controller
 
     public function index(Request $request)
     {
+        $this->authorizeReportAccess();
         $data = $this->getReportData($request);
         return view('reports.index', $data);
     }
 
     public function previewPdf(Request $request)
     {
+        $this->authorizeReportAccess();
         $data = $this->getReportData($request);
         $data['bendaharaName'] = User::where('role', 'bendahara')->value('name') ?? 'Bendahara NEXVO';
         $data['ketuaName'] = User::where('role', 'ketua')->value('name') ?? 'Ketua NEXVO';
@@ -88,6 +100,7 @@ class ReportController extends Controller
 
     public function exportExcel(Request $request)
     {
+        $this->authorizeReportAccess();
         $data = $this->getReportData($request);
         $fileName = 'Laporan_Keuangan_' . $data['startDate'] . '_sd_' . $data['endDate'] . '.xls';
 

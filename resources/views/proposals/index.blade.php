@@ -1336,13 +1336,18 @@
         const idx = itemRowCounters[propId]++;
         const container = document.getElementById('realizationItemsContainer' + propId);
         const row = document.createElement('div');
-        row.className = 'row g-1';
+        row.className = 'row g-1 align-items-center realization-item-row';
         row.innerHTML = `
-            <div class="col-7">
+            <div class="col-6">
                 <input type="text" name="items[${idx}][description]" class="form-control form-control-sm rounded-2" placeholder="Nama item / keperluan" required>
             </div>
-            <div class="col-5">
+            <div class="col-4">
                 <input type="number" name="items[${idx}][amount]" class="form-control form-control-sm rounded-2" placeholder="Nominal (Rp)" min="1" required>
+            </div>
+            <div class="col-2 text-end">
+                <button type="button" class="btn btn-sm btn-outline-danger w-100 rounded-2 px-0" title="Hapus baris" onclick="this.closest('.realization-item-row').remove()">
+                    <i class="bi bi-trash3"></i>
+                </button>
             </div>
         `;
         container.appendChild(row);

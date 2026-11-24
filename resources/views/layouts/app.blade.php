@@ -360,6 +360,7 @@
     $role = Auth::user()->role;
     $isAdminRole = ($role === 'admin');
     $isBendaharaRole = ($role === 'bendahara');
+    $isFinanceViewerRole = in_array($role, ['ketua', 'bendahara']);
 
     $isMyProposals = request()->routeIs('proposals.index') && request()->query('tab', 'my') === 'my';
     $isPenyaluranSection = request()->query('section') === 'penyaluran';
@@ -427,7 +428,7 @@
 
         <div class="menu-label">Menu Utama</div>
 
-        <!-- 1. Dashboard -->
+        <!-- 1. Dashboard (Semua Role) -->
         <a href="{{ route('dashboard', $role) }}" class="nav-item-main {{ request()->routeIs('dashboard') ? 'active' : '' }}">
             <span><i class="bi bi-grid-1x2 me-2"></i> Dashboard</span>
         </a>
@@ -462,7 +463,7 @@
             <!-- SIDEBAR OPERASIONAL KEUANGAN (ANGGOTA, KOORDIV, KETUA, BENDAHARA) -->
             <!-- ================================================================= -->
 
-            <!-- 2. Pengajuan Dana -->
+            <!-- 2. Pengajuan Dana (Anggota, Koordiv, Ketua, Bendahara) -->
             <div class="nav-item-main {{ $isProposalGroup ? 'parent-active' : '' }}" data-bs-toggle="collapse" data-bs-target="#menuPengajuan" aria-expanded="{{ $isProposalGroup ? 'true' : 'false' }}">
                 <span><i class="bi bi-plus-circle me-2"></i> Pengajuan Dana</span>
                 <i class="bi bi-chevron-down small chevron-icon"></i>
@@ -485,7 +486,7 @@
             <!-- 2b. Penyaluran Dana (Khusus Bendahara) -->
             @if($isBendaharaRole)
             <div class="nav-item-main {{ $isPenyaluranGroup ? 'parent-active' : '' }}" data-bs-toggle="collapse" data-bs-target="#menuPenyaluran" aria-expanded="{{ $isPenyaluranGroup ? 'true' : 'false' }}">
-                <span><i class="bi bi-plus-circle me-2"></i> Penyaluran Dana</span>
+                <span><i class="bi bi-send-check me-2"></i> Penyaluran Dana</span>
                 <div class="d-flex align-items-center gap-2">
                     @if($pendingCount > 0)
                         <span class="badge-count">{{ $pendingCount }}</span>
@@ -509,7 +510,7 @@
             </div>
             @endif
 
-            <!-- 3. Persetujuan Dana (Untuk Koordiv, Ketua, Bendahara) -->
+            <!-- 3. Persetujuan Dana (Hanya untuk Koordiv, Ketua, Bendahara) -->
             @if(in_array($role, ['koordiv', 'ketua', 'bendahara']))
             <div class="nav-item-main {{ $isApprovalGroup ? 'parent-active' : '' }}" data-bs-toggle="collapse" data-bs-target="#menuPersetujuan" aria-expanded="{{ $isApprovalGroup ? 'true' : 'false' }}">
                 <span><i class="bi bi-check-circle me-2"></i> Persetujuan Dana</span>
@@ -538,7 +539,8 @@
             </div>
             @endif
 
-            <!-- 4. Transaksi & Bukti Kas -->
+            <!-- 4. Transaksi & Bukti Kas + 5. Audit Log (Hanya Ketua & Bendahara) -->
+            @if($isFinanceViewerRole)
             <div class="nav-item-main {{ $isTransactionMenu ? 'parent-active' : '' }}" data-bs-toggle="collapse" data-bs-target="#menuTransaksi" aria-expanded="{{ $isTransactionMenu ? 'true' : 'false' }}">
                 <span>
                     <i class="bi bi-receipt me-2"></i> Transaksi &amp; Bukti Kas
@@ -560,7 +562,6 @@
                 </ul>
             </div>
 
-            <!-- 5. Audit Log -->
             <div class="nav-item-main {{ $isAuditMenu ? 'parent-active' : '' }}" data-bs-toggle="collapse" data-bs-target="#menuAudit" aria-expanded="{{ $isAuditMenu ? 'true' : 'false' }}">
                 <span><i class="bi bi-clock-history me-2"></i> Audit Log</span>
                 <i class="bi bi-chevron-down small chevron-icon"></i>
@@ -574,6 +575,7 @@
                     </li>
                 </ul>
             </div>
+            @endif
         @endif
     </div>
 

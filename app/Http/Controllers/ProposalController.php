@@ -16,8 +16,24 @@ class ProposalController extends Controller
     public function index(Request $request)
     {
         $user = Auth::user();
+
+        if ($user->role === 'admin') {
+            abort(403, 'Administrator tidak memiliki akses ke modul pengajuan dana operasional.');
+        }
+
         $tab = $request->query('tab', 'my'); // 'my', 'approvals', 'history'
         $isPenyaluranSection = ($request->query('section') === 'penyaluran');
+
+        // Hanya Bendahara yang boleh membuka section Penyaluran Dana
+        if ($isPenyaluranSection && $user->role !== 'bendahara') {
+            ActivityLog::record('Percobaan mengakses halaman Penyaluran Dana tanpa wewenang', 'failed');
+            abort(403, 'Akses ditolak. Hanya Bendahara yang berwenang mengelola penyaluran dana.');
+        }
+
+        // Anggota hanya boleh melihat pengajuannya sendiri ('my')
+        if ($user->role === 'anggota' && in_array($tab, ['approvals', 'history'])) {
+            abort(403, 'Akses ditolak. Anggota hanya dapat melihat pengajuan milik pribadi.');
+        }
 
         if ($tab === 'approvals') {
             $query = Proposal::with('user')->where('user_id', '!=', $user->id);
@@ -29,8 +45,6 @@ class ProposalController extends Controller
                 $query->where('status', 'pending_ketua');
             } elseif ($user->role === 'bendahara') {
                 if ($isPenyaluranSection) {
-                    // Menu Penyaluran Dana -> Antrean Pencairan:
-                    // Semua yang berstatus 'pending_disbursement' ATAU data lama 'pending_bendahara' dari Anggota/Koordiv
                     $query->where(function ($q) {
                         $q->where('status', 'pending_disbursement')
                           ->orWhere(function ($sub) {
@@ -39,7 +53,7 @@ class ProposalController extends Controller
                           });
                     });
                 } else {
-                    // Menu Persetujuan Dana -> Menunggu Validasi (khusus pengajuan dari Ketua)
+                    // Menu Persetujuan Dana -> Menunggu Validasi (khusus pengajuan silang dari Ketua)
                     $query->where('status', 'pending_bendahara')
                           ->whereHas('user', fn($q) => $q->whereRaw('LOWER(role) = ?', ['ketua']));
                 }
@@ -57,11 +71,10 @@ class ProposalController extends Controller
             } elseif ($user->role === 'ketua') {
                 $query->whereIn('status', ['pending_bendahara', 'pending_disbursement', 'approved', 'rejected']);
             } elseif ($user->role === 'bendahara') {
-                // Riwayat persetujuan Bendahara (pengajuan Ketua yang sudah disetujui/ditolak)
                 $query->whereHas('user', fn($q) => $q->whereRaw('LOWER(role) = ?', ['ketua']))
                       ->whereIn('status', ['pending_disbursement', 'approved', 'rejected']);
             } else {
-                $query->whereIn('status', ['pending_ketua', 'pending_bendahara', 'pending_disbursement', 'approved', 'rejected']);
+                $query->where('status', 'none');
             }
 
             $proposals = $query->latest('updated_at')->get();
@@ -69,7 +82,7 @@ class ProposalController extends Controller
             $proposals = Proposal::with('user')->where('user_id', $user->id)->latest()->get();
         }
 
-        // Hitung saldo kas real-time (mengecualikan transaksi Void)
+        // Hitung saldo kas real-time (mengecualikan transaksi Void) untuk transparansi
         $allTrx = Transaction::with('category')->whereNull('voided_at')->get();
         $totalIncome = $allTrx->filter(fn($t) => ($t->category?->type ?? 'expense') === 'income')->sum('amount');
         $totalExpense = $allTrx->filter(fn($t) => ($t->category?->type ?? 'expense') === 'expense')->sum('amount');
@@ -80,12 +93,22 @@ class ProposalController extends Controller
 
     public function create()
     {
+        if (Auth::user()->role === 'admin') {
+            abort(403, 'Administrator tidak dapat membuat pengajuan dana.');
+        }
+
         $categories = Category::where('type', 'expense')->get();
         return view('proposals.create', compact('categories'));
     }
 
     public function store(Request $request)
     {
+        $role = Auth::user()->role;
+
+        if (!in_array($role, ['anggota', 'koordiv', 'bendahara', 'ketua'])) {
+            abort(403, 'Role Anda tidak berwenang membuat pengajuan dana.');
+        }
+
         $request->validate([
             'title' => 'required|string|max:255',
             'amount' => 'required|numeric|min:1',
@@ -98,12 +121,10 @@ class ProposalController extends Controller
             $documentPath = $request->file('document')->store('proposals', 'public');
         }
 
-        $role = Auth::user()->role;
         $initialStatus = match ($role) {
             'anggota' => 'pending_koordiv',
             'koordiv', 'bendahara' => 'pending_ketua',
             'ketua' => 'pending_bendahara',
-            default => 'pending_ketua',
         };
 
         $proposal = Proposal::create([
@@ -124,10 +145,33 @@ class ProposalController extends Controller
     public function updateStatus(Request $request, Proposal $proposal)
     {
         $user = Auth::user();
+        $proposal->loadMissing('user');
 
+        // 1. Aturan No Self-Approve
         if ($proposal->user_id === $user->id) {
             ActivityLog::record('Percobaan validasi pengajuan milik sendiri', 'failed');
             return back()->with('error', 'Anda tidak dapat memvalidasi pengajuan Anda sendiri.');
+        }
+
+        // 2. Cek apakah role ini berwenang memvalidasi tahap pengajuan saat ini (berlaku untuk approve maupun reject)
+        $isDisbursementForm = $request->boolean('is_disbursement');
+        $canValidate = false;
+
+        if ($user->role === 'koordiv' && $proposal->status === 'pending_koordiv') {
+            $canValidate = ($proposal->user?->role === 'anggota' && $proposal->user?->division === $user->division);
+        } elseif ($user->role === 'ketua' && $proposal->status === 'pending_ketua') {
+            $canValidate = true;
+        } elseif ($user->role === 'bendahara') {
+            if ($isDisbursementForm && in_array($proposal->status, ['pending_disbursement', 'pending_bendahara'])) {
+                $canValidate = true;
+            } elseif (!$isDisbursementForm && $proposal->status === 'pending_bendahara' && strtolower($proposal->user?->role ?? '') === 'ketua') {
+                $canValidate = true;
+            }
+        }
+
+        if (!$canValidate) {
+            ActivityLog::record('Percobaan menyetujui/menolak pengajuan dana tanpa wewenang', 'failed');
+            abort(403, 'Anda tidak memiliki wewenang pada tahap validasi pengajuan ini.');
         }
 
         $action = $request->input('action'); // 'approve' atau 'reject'
@@ -152,7 +196,6 @@ class ProposalController extends Controller
         }
 
         // Validasi Bukti Pencairan Wajib jika dikirim dari modal Rincian dan Pencairan
-        $isDisbursementForm = $request->boolean('is_disbursement');
         if ($isDisbursementForm) {
             $request->validate([
                 'disbursement_method' => 'required|in:Transfer,Tunai',
@@ -164,24 +207,12 @@ class ProposalController extends Controller
             ]);
         }
 
-        $nextStatus = $proposal->status;
-
-        if ($proposal->status === 'pending_koordiv' && $user->role === 'koordiv') {
-            // Koordiv setujui -> lanjut ke Ketua
-            $nextStatus = 'pending_ketua';
-        } elseif ($proposal->status === 'pending_ketua' && $user->role === 'ketua') {
-            // Ketua setujui -> langsung masuk ke Antrean Pencairan Bendahara (pending_disbursement)
-            $nextStatus = 'pending_disbursement';
-        } elseif ($proposal->status === 'pending_bendahara' && $user->role === 'bendahara' && !$isDisbursementForm) {
-            // Bendahara menyetujui pengajuan Ketua -> masuk ke Antrean Pencairan (pending_disbursement)
-            $nextStatus = 'pending_disbursement';
-        } elseif (in_array($proposal->status, ['pending_disbursement', 'pending_bendahara']) && $user->role === 'bendahara' && $isDisbursementForm) {
-            // Bendahara mencairkan dana di menu Antrean Pencairan -> selesai (approved) & tercatat ke Buku Kas
-            $nextStatus = 'approved';
-        } else {
-            ActivityLog::record('Percobaan menyetujui/mencairkan pengajuan dana tanpa wewenang', 'failed');
-            return back()->with('error', 'Anda tidak memiliki wewenang pada tahap validasi saat ini.');
-        }
+        $nextStatus = match (true) {
+            $proposal->status === 'pending_koordiv' && $user->role === 'koordiv' => 'pending_ketua',
+            $proposal->status === 'pending_ketua' && $user->role === 'ketua' => 'pending_disbursement',
+            $proposal->status === 'pending_bendahara' && $user->role === 'bendahara' && !$isDisbursementForm => 'pending_disbursement',
+            in_array($proposal->status, ['pending_disbursement', 'pending_bendahara']) && $user->role === 'bendahara' && $isDisbursementForm => 'approved',
+        };
 
         $proofPath = null;
         if ($request->hasFile('proof_file')) {
@@ -266,7 +297,6 @@ class ProposalController extends Controller
             'proof_photos.required' => 'Unggah minimal 1 foto struk / nota bukti penggunaan dana.',
         ]);
 
-        // Hapus foto lama jika mengunggah ulang setelah ditolak
         if (!empty($proposal->realization_proofs)) {
             foreach ($proposal->realization_proofs as $oldPath) {
                 if (Storage::disk('public')->exists($oldPath)) {
