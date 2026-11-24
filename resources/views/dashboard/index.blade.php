@@ -247,92 +247,99 @@
     </div>
 </div>
 
-@if($isFinanceViewer)
-    <!-- =================================================================== -->
-    <!-- KONTEN KEUANGAN LENGKAP (KHUSUS KETUA & BENDAHARA)                  -->
-    <!-- =================================================================== -->
-    <!-- Baris Tengah: Financial Overview (Kiri) & Pending Approvals (Kanan) -->
-    <div class="row g-3 mb-4">
-        <div class="col-lg-8">
-            <div class="nexvo-card h-100 d-flex flex-column justify-content-between">
-                <div class="d-flex flex-wrap justify-content-between align-items-start mb-3 gap-2">
-                    <div>
-                        <h5 class="fw-bold mb-0" style="font-size: 16px;">Financial Overview ({{ $periodDate->year }})</h5>
-                        <p class="text-muted mb-2" style="font-size: 12px;">Ringkasan arus pemasukan dan pengeluaran organisasi (dalam Juta Rupiah).</p>
-                        <div class="d-flex align-items-center gap-3" style="font-size: 11.5px;">
-                            <span><i class="bi bi-circle-fill me-1" style="color: #607990;"></i> Pemasukan</span>
-                            <span><i class="bi bi-circle-fill me-1" style="color: #243242;"></i> Pengeluaran</span>
-                        </div>
-                    </div>
-                    <div class="btn-group btn-group-sm" role="group">
-                        <button type="button" id="btnChartSemester1" class="btn btn-light border" style="font-size: 11.5px;" onclick="switchChartRange('h1')">Jan - Jun</button>
-                        <button type="button" id="btnChartSemester2" class="btn btn-light border" style="font-size: 11.5px;" onclick="switchChartRange('h2')">Jul - Des</button>
-                        <button type="button" id="btnChartFullYear" class="btn border fw-semibold" style="background-color: #C5D3DF; font-size: 11.5px;" onclick="switchChartRange('all')">Tahunan</button>
+<!-- =================================================================== -->
+<!-- DIAGRAM BATANG SERAGAM UNTUK SEMUA ROLE (ANGGOTA, KOORDIV, KETUA, BENDAHARA) -->
+<!-- =================================================================== -->
+<div class="row g-3 mb-4">
+    <div class="{{ $isFinanceViewer ? 'col-lg-8' : 'col-12' }}">
+        <div class="nexvo-card h-100 d-flex flex-column justify-content-between">
+            <div class="d-flex flex-wrap justify-content-between align-items-start mb-3 gap-2">
+                <div>
+                    <h5 class="fw-bold mb-0" style="font-size: 16px;">Financial Overview ({{ $periodDate->year }})</h5>
+                    <p class="text-muted mb-2" style="font-size: 12px;">Ringkasan arus pemasukan dan pengeluaran organisasi (dalam Juta Rupiah).</p>
+                    <div class="d-flex align-items-center gap-3" style="font-size: 11.5px;">
+                        <span><i class="bi bi-circle-fill me-1" style="color: #607990;"></i> Pemasukan</span>
+                        <span><i class="bi bi-circle-fill me-1" style="color: #243242;"></i> Pengeluaran</span>
                     </div>
                 </div>
-
-                <div style="height: 215px;">
-                    <canvas id="financialChart"></canvas>
+                <div class="btn-group btn-group-sm" role="group">
+                    <button type="button" id="btnChartSemester1" class="btn btn-light border" style="font-size: 11.5px;" onclick="switchChartRange('h1')">Jan - Jun</button>
+                    <button type="button" id="btnChartSemester2" class="btn btn-light border" style="font-size: 11.5px;" onclick="switchChartRange('h2')">Jul - Des</button>
+                    <button type="button" id="btnChartFullYear" class="btn border fw-semibold" style="background-color: #C5D3DF; font-size: 11.5px;" onclick="switchChartRange('all')">Tahunan</button>
                 </div>
+            </div>
 
-                <div class="d-flex flex-wrap justify-content-between align-items-center text-muted mt-2" style="font-size: 11.5px;">
-                    <span>
-                        {{ $periodDate->locale('id')->translatedFormat('F Y') }}:
-                        <strong>Rp {{ number_format($totalIncome, 0, ',', '.') }}</strong> masuk &bull;
-                        <strong>Rp {{ number_format($totalExpense, 0, ',', '.') }}</strong> keluar
-                    </span>
+            <div style="height: 225px;">
+                <canvas id="financialChart"></canvas>
+            </div>
+
+            <div class="d-flex flex-wrap justify-content-between align-items-center text-muted mt-2" style="font-size: 11.5px;">
+                <span>
+                    {{ $periodDate->locale('id')->translatedFormat('F Y') }}:
+                    <strong>Rp {{ number_format($totalIncome, 0, ',', '.') }}</strong> masuk &bull;
+                    <strong>Rp {{ number_format($totalExpense, 0, ',', '.') }}</strong> keluar
+                </span>
+                @if($isFinanceViewer)
                     <a href="{{ route('reports.index') }}" class="text-decoration-none fw-semibold" style="color: #47637E;">
                         Detail Laporan &rarr;
                     </a>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-lg-4">
-            <div class="nexvo-card h-100 d-flex flex-column justify-content-between">
-                <div>
-                    <h5 class="fw-bold mb-0" style="font-size: 16px;">{{ $roleMeta['widget_title'] }}</h5>
-                    <p class="text-muted mb-3" style="font-size: 12px;">{{ $roleMeta['widget_sub'] }}</p>
-
-                    <div class="d-flex flex-column gap-2">
-                        @forelse($recentPendingProposals as $prop)
-                        @php
-                            $targetActionUrl = ($role === 'bendahara' && $prop->status === 'waiting_verification')
-                                ? route('transactions.index', ['tab' => 'verification'])
-                                : route('proposals.index', ['tab' => 'approvals']);
-                        @endphp
-                        <div class="d-flex justify-content-between align-items-center p-2.5 px-3 rounded-3" style="background-color: #EFECE8;">
-                            <div class="me-2" style="min-width: 0;">
-                                <div class="fw-bold text-truncate" style="font-size: 13px;">{{ $prop->title ?? ($prop->user?->name ?? 'Pengajuan') }}</div>
-                                <div class="text-muted text-truncate" style="font-size: 11px;">
-                                    {{ $prop->user?->name ?? '-' }} &bull; {{ $statusLabels[$prop->status]['label'] ?? ucfirst($prop->status) }}
-                                </div>
-                            </div>
-                            <div class="text-end me-2 flex-shrink-0">
-                                <div class="fw-bold" style="font-size: 12.5px;">Rp {{ number_format($prop->amount, 0, ',', '.') }}</div>
-                                <div class="text-muted" style="font-size: 10.5px;">{{ $prop->created_at->format('d M Y') }}</div>
-                            </div>
-                            <a href="{{ $targetActionUrl }}" class="btn-nexvo-dark py-1 px-3 text-decoration-none flex-shrink-0" style="font-size: 11.5px;">
-                                {{ $roleMeta['widget_btn'] }}
-                            </a>
-                        </div>
-                        @empty
-                        <div class="text-center text-muted py-4 rounded-3" style="font-size: 12.5px; background-color: #F8FAFC;">
-                            <i class="bi bi-check2-circle d-block fs-4 mb-1 text-success"></i>
-                            Tidak ada antrean yang perlu ditindaklanjuti saat ini.
-                        </div>
-                        @endforelse
-                    </div>
-                </div>
-
-                <a href="{{ $roleMeta['kpi4_url'] }}" class="btn-nexvo-soft w-100 text-center mt-3 py-2 text-decoration-none">
-                    Lihat Semua Pengajuan
-                </a>
+                @else
+                    <span class="text-muted">Transparansi arus kas organisasi</span>
+                @endif
             </div>
         </div>
     </div>
 
-    <!-- Baris Bawah: Recent Transactions (Kiri) & Recent Activities (Kanan) -->
+    @if($isFinanceViewer)
+    <div class="col-lg-4">
+        <div class="nexvo-card h-100 d-flex flex-column justify-content-between">
+            <div>
+                <h5 class="fw-bold mb-0" style="font-size: 16px;">{{ $roleMeta['widget_title'] }}</h5>
+                <p class="text-muted mb-3" style="font-size: 12px;">{{ $roleMeta['widget_sub'] }}</p>
+
+                <div class="d-flex flex-column gap-2">
+                    @forelse($recentPendingProposals as $prop)
+                    @php
+                        $targetActionUrl = ($role === 'bendahara' && $prop->status === 'waiting_verification')
+                            ? route('transactions.index', ['tab' => 'verification'])
+                            : route('proposals.index', ['tab' => 'approvals']);
+                    @endphp
+                    <div class="d-flex justify-content-between align-items-center p-2.5 px-3 rounded-3" style="background-color: #EFECE8;">
+                        <div class="me-2" style="min-width: 0;">
+                            <div class="fw-bold text-truncate" style="font-size: 13px;">{{ $prop->title ?? ($prop->user?->name ?? 'Pengajuan') }}</div>
+                            <div class="text-muted text-truncate" style="font-size: 11px;">
+                                {{ $prop->user?->name ?? '-' }} &bull; {{ $statusLabels[$prop->status]['label'] ?? ucfirst($prop->status) }}
+                            </div>
+                        </div>
+                        <div class="text-end me-2 flex-shrink-0">
+                            <div class="fw-bold" style="font-size: 12.5px;">Rp {{ number_format($prop->amount, 0, ',', '.') }}</div>
+                            <div class="text-muted" style="font-size: 10.5px;">{{ $prop->created_at->format('d M Y') }}</div>
+                        </div>
+                        <a href="{{ $targetActionUrl }}" class="btn-nexvo-dark py-1 px-3 text-decoration-none flex-shrink-0" style="font-size: 11.5px;">
+                            {{ $roleMeta['widget_btn'] }}
+                        </a>
+                    </div>
+                    @empty
+                    <div class="text-center text-muted py-4 rounded-3" style="font-size: 12.5px; background-color: #F8FAFC;">
+                        <i class="bi bi-check2-circle d-block fs-4 mb-1 text-success"></i>
+                        Tidak ada antrean yang perlu ditindaklanjuti saat ini.
+                    </div>
+                    @endforelse
+                </div>
+            </div>
+
+            <a href="{{ $roleMeta['kpi4_url'] }}" class="btn-nexvo-soft w-100 text-center mt-3 py-2 text-decoration-none">
+                Lihat Semua Pengajuan
+            </a>
+        </div>
+    </div>
+    @endif
+</div>
+
+@if($isFinanceViewer)
+    <!-- =================================================================== -->
+    <!-- BARIS BAWAH KEUANGAN (KHUSUS KETUA & BENDAHARA)                     -->
+    <!-- =================================================================== -->
     <div class="row g-3">
         <div class="col-lg-8">
             <div class="nexvo-card h-100 d-flex flex-column justify-content-between">
@@ -492,7 +499,6 @@
 @endsection
 
 @push('scripts')
-@if($isFinanceViewer)
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
     const allLabels = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
@@ -592,5 +598,4 @@
         financialChartInstance.update();
     }
 </script>
-@endif
 @endpush

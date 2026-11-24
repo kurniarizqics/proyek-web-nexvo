@@ -33,7 +33,7 @@ Route::post('/logout', [AuthController::class, 'logout'])
 // Rute Terproteksi Login
 Route::middleware('auth')->group(function () {
 // =========================================================================
-    // 1. DASHBOARD PER ROLE (TRANSPARANSI SALDO KAS UNTUK SEMUA AKTOR)
+    // 1. DASHBOARD PER ROLE (TRANSPARANSI SALDO KAS & DIAGRAM BATANG SERAGAM)
     // =========================================================================
     Route::get('/dashboard/{role?}', function (Request $request, ?string $role = null) {
         $user = Auth::user();
@@ -56,7 +56,7 @@ Route::middleware('auth')->group(function () {
             $periodDate = now()->startOfMonth();
         }
 
-        // A. TRANSPARANSI SALDO KAS (Dihitung untuk semua peran: Anggota, Koordiv, Bendahara, Ketua)
+        // A. TRANSPARANSI SALDO KAS & GRAFIK (Dihitung seragam untuk semua peran)
         $allTransactions = Transaction::with('category')->whereNull('voided_at')->get();
         $allIncome = $allTransactions->filter(fn($t) => ($t->category?->type ?? 'expense') === 'income')->sum('amount');
         $allExpense = $allTransactions->filter(fn($t) => ($t->category?->type ?? 'expense') === 'expense')->sum('amount');
@@ -147,12 +147,8 @@ Route::middleware('auth')->group(function () {
             $monthOptions[$d->format('Y-m')] = $d->locale('id')->translatedFormat('F Y');
         }
 
-        $specificViewPath = resource_path('views/dashboard/' . $targetRole . '.blade.php');
-        $viewName = (file_exists($specificViewPath) && filesize($specificViewPath) > 0)
-            ? 'dashboard.' . $targetRole
-            : 'dashboard.index';
-
-        return view($viewName, compact(
+        // Semua role operasional memakai view dashboard.index yang seragam
+        return view('dashboard.index', compact(
             'balance',
             'totalIncome',
             'totalExpense',
@@ -168,7 +164,7 @@ Route::middleware('auth')->group(function () {
             'monthlyExpenseChart'
         ));
     })->name('dashboard');
-
+    
     // =========================================================================
     // 2. PENGAJUAN & PERSETUJUAN DANA (Anggota, Koordiv, Ketua, Bendahara)
     // =========================================================================
