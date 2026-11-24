@@ -86,7 +86,7 @@ Kemudian buka file `.env` dan sesuaikan konfigurasi database:
 DB_CONNECTION=mysql
 DB_HOST=127.0.0.1
 DB_PORT=3306
-DB_DATABASE=nama_database
+DB_DATABASE=nexvo_finance
 DB_USERNAME=root
 DB_PASSWORD=
 ```
@@ -105,20 +105,6 @@ Jika project menyediakan seeder untuk mengisi data awal, jalankan:
 
 ```bash
 php artisan db:seed
-```
-
-### 7. Install Dependency Frontend
-
-Jika project menggunakan Vite dan memiliki `package.json`, jalankan:
-
-```bash
-npm install
-```
-
-Kemudian:
-
-```bash
-npm run dev
 ```
 
 Biarkan terminal tetap berjalan selama pengembangan.
