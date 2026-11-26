@@ -101,9 +101,6 @@
                 <tr>
                     <td class="py-3">
                         <div class="d-flex align-items-center gap-2.5">
-                            <div class="rounded-circle d-flex align-items-center justify-content-center fw-bold text-white flex-shrink-0" style="width: 36px; height: 36px; background-color: #2F4156; font-size: 13px;">
-                                {{ strtoupper(substr($u->name, 0, 1)) }}
-                            </div>
                             <div>
                                 <div class="fw-bold" style="color: #1E293B;">{{ $u->name }}</div>
                                 <div class="text-muted" style="font-size: 11.5px;">{{ $u->email }}</div>
@@ -184,14 +181,11 @@
                                             <option value="anggota" {{ $u->role === 'anggota' ? 'selected' : '' }}>Anggota</option>
                                             <option value="koordiv" {{ $u->role === 'koordiv' ? 'selected' : '' }}>Koordinator Divisi</option>
                                             <option value="bendahara" {{ $u->role === 'bendahara' ? 'selected' : '' }}>Bendahara</option>
-                                            <option value="ketua" {{ $u->role === 'ketua' ? 'selected' : '' }}>Ketua</option>
+                                            @if(!$hasKetua || $u->role === 'ketua')
+                                                <option value="ketua" {{ $u->role === 'ketua' ? 'selected' : '' }}>Ketua</option>
+                                            @endif
                                             <option value="admin" {{ $u->role === 'admin' ? 'selected' : '' }}>Administrator</option>
                                         </select>
-                                    </div>
-                                    <div class="mb-2">
-                                        <label class="form-label fw-medium small">Divisi (Pilih atau Ketik Manual)</label>
-                                        <input type="text" name="division_name" list="divisionOptionsList" value="{{ $u->division }}" class="form-control" placeholder="Ketik atau pilih nama divisi (kosongkan jika tidak terikat)">
-                                        <div class="form-text" style="font-size: 11px;">Klik kolom untuk memilih divisi yang sudah ada, atau ketik nama divisi baru.</div>
                                     </div>
                                 </div>
                                 <div class="modal-footer border-0">
