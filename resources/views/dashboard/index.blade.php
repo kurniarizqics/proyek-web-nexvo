@@ -95,6 +95,15 @@
     .row-clickable:hover {
         background-color: #F8FAFC !important;
     }
+    .queue-item-box {
+        background-color: #F4EFEA;
+        border-radius: 12px;
+        padding: 12px 14px;
+        transition: background-color 0.15s ease;
+    }
+    .queue-item-box:hover {
+        background-color: #ECE5DE;
+    }
 </style>
 
 <!-- Header Dashboard & Filter -->
@@ -297,30 +306,38 @@
                 <h5 class="fw-bold mb-0" style="font-size: 16px;">{{ $roleMeta['widget_title'] }}</h5>
                 <p class="text-muted mb-3" style="font-size: 12px;">{{ $roleMeta['widget_sub'] }}</p>
 
-                <div class="d-flex flex-column gap-2">
-                    @forelse($recentPendingProposals as $prop)
+                <div class="d-flex flex-column gap-3">
+                    @forelse($recentPendingProposals->take(3) as $prop)
                     @php
                         $targetActionUrl = ($role === 'bendahara' && $prop->status === 'waiting_verification')
                             ? route('transactions.index', ['tab' => 'verification'])
                             : route('proposals.index', ['tab' => 'approvals']);
                     @endphp
-                    <div class="d-flex justify-content-between align-items-center p-2.5 px-3 rounded-3" style="background-color: #EFECE8;">
-                        <div class="me-2" style="min-width: 0;">
-                            <div class="fw-bold text-truncate" style="font-size: 13px;">{{ $prop->title ?? ($prop->user?->name ?? 'Pengajuan') }}</div>
-                            <div class="text-muted text-truncate" style="font-size: 11px;">
-                                {{ $prop->user?->name ?? '-' }} &bull; {{ $statusLabels[$prop->status]['label'] ?? ucfirst($prop->status) }}
+                    <div class="queue-item-box">
+                        <!-- Baris Atas: Judul & Subjudul Full Width (Tidak Terpotong Tombol) -->
+                        <div class="fw-bold text-truncate mb-1" style="font-size: 13px; color: #1E293B;" title="{{ $prop->title ?? ($prop->user?->name ?? 'Pengajuan') }}">
+                            {{ $prop->title ?? ($prop->user?->name ?? 'Pengajuan') }}
+                        </div>
+                        <div class="text-muted text-truncate mb-2" style="font-size: 11px;">
+                            {{ $prop->user?->name ?? '-' }} &bull; {{ $statusLabels[$prop->status]['label'] ?? ucfirst($prop->status) }}
+                        </div>
+
+                        <!-- Baris Bawah: Nominal & Tanggal di Kiri, Tombol Sejajar di Kanan -->
+                        <div class="d-flex justify-content-between align-items-center pt-2 border-top" style="border-color: rgba(47, 65, 86, 0.08) !important;">
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="fw-bold" style="font-size: 12.5px; color: #2F4156;">
+                                    Rp {{ number_format($prop->amount, 0, ',', '.') }}
+                                </span>
+                                <span class="text-muted" style="font-size: 10.5px;">&bull; {{ $prop->created_at->locale('id')->translatedFormat('d M Y') }}</span>
                             </div>
+
+                            <a href="{{ $targetActionUrl }}" class="btn-nexvo-dark py-1 px-3 text-decoration-none flex-shrink-0" style="font-size: 11.5px;">
+                                {{ $roleMeta['widget_btn'] }}
+                            </a>
                         </div>
-                        <div class="text-end me-2 flex-shrink-0">
-                            <div class="fw-bold" style="font-size: 12.5px;">Rp {{ number_format($prop->amount, 0, ',', '.') }}</div>
-                            <div class="text-muted" style="font-size: 10.5px;">{{ $prop->created_at->format('d M Y') }}</div>
-                        </div>
-                        <a href="{{ $targetActionUrl }}" class="btn-nexvo-dark py-1 px-3 text-decoration-none flex-shrink-0" style="font-size: 11.5px;">
-                            {{ $roleMeta['widget_btn'] }}
-                        </a>
                     </div>
                     @empty
-                    <div class="text-center text-muted py-4 rounded-3" style="font-size: 12.5px; background-color: #F8FAFC;">
+                    <div class="text-center text-muted py-5 rounded-3" style="font-size: 12.5px; background-color: #F8FAFC;">
                         <i class="bi bi-check2-circle d-block fs-4 mb-1 text-success"></i>
                         Tidak ada antrean yang perlu ditindaklanjuti saat ini.
                     </div>

@@ -37,9 +37,9 @@
         ->sortDesc()
         ->values();
 
-    // Antrean pengajuan menunggu pencairan/persetujuan Bendahara
+    // Antrean pengajuan menunggu validasi, pencairan, atau verifikasi realisasi Bendahara
     $pendingDisbursements = \App\Models\Proposal::with('user')
-        ->whereIn('status', ['pending_disbursement', 'pending_ketua'])
+        ->whereIn('status', ['pending_disbursement', 'pending_bendahara', 'pending_ketua'])
         ->where('user_id', '!=', Auth::id())
         ->latest()
         ->get();
@@ -84,6 +84,31 @@
         color: #1E293B;
         border-radius: 14px;
         border: 1px solid #E5E7EB;
+    }
+    .queue-item-box {
+        background-color: #F4EFEA;
+        border-radius: 12px;
+        padding: 12px 14px;
+        transition: background-color 0.15s ease;
+    }
+    .queue-item-box:hover {
+        background-color: #ECE5DE;
+    }
+    .btn-proses-dark {
+        background-color: #2F4156;
+        color: #FFFFFF;
+        border: none;
+        border-radius: 8px;
+        padding: 6px 14px;
+        font-size: 11.5px;
+        font-weight: 500;
+        text-decoration: none;
+        display: inline-block;
+        transition: background-color 0.15s ease;
+    }
+    .btn-proses-dark:hover {
+        background-color: #223040;
+        color: #FFFFFF;
     }
     .btn-cairkan {
         background-color: #2F4156;
@@ -135,9 +160,12 @@
 <!-- 1. HEADER DASHBOARD & FILTER BAR -->
 <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
     <div>
-        <h3 class="fw-bold mb-1" style="color: #2F4156;">Dashboard</h3>
+        <div class="d-flex align-items-center gap-2 mb-1">
+            <h3 class="fw-bold mb-0" style="color: #2F4156;">Dashboard</h3>
+            <span class="badge rounded-2 px-2 py-1 fw-medium" style="background-color: #E8EEF3; color: #567C8D; font-size: 11px;">Bendahara</span>
+        </div>
         <p class="text-muted mb-0" style="font-size: 12.5px;">
-            Prioritas hari ini: {{ $readyToDisburseCount }} pengajuan siap dicairkan menunggu tindakan Anda.
+            Selamat datang kembali, {{ Auth::user()->name }}. Pantau saldo kas, pencairan dana disetujui, dan verifikasi bukti realisasi anggota.
         </p>
     </div>
 
@@ -165,9 +193,9 @@
             Export Laporan
         </a>
 
-        <!-- Buat Permintaan -->
-        <a href="{{ route('proposals.create') }}" class="btn rounded-3 px-3 py-2 fw-medium text-white" style="background-color: #2F4156; font-size: 12px;">
-            Buat Permintaan
+        <!-- Catat Kas -->
+        <a href="{{ route('transactions.index') }}" class="btn rounded-3 px-3 py-2 fw-medium text-white" style="background-color: #2F4156; font-size: 12px;">
+            + Catat Kas
         </a>
     </div>
 </div>
@@ -175,15 +203,15 @@
 <!-- 2. EMPAT KARTU RINGKASAN (KPI CARDS) -->
 <div class="row g-3 mb-4">
     <div class="col-md-6 col-xl-3">
-        <div class="bendahara-kpi-dark p-4 h-100 shadow-sm">
+        <div class="bendahara-kpi-light p-4 h-100 shadow-sm">
             <div class="d-flex justify-content-between align-items-center mb-3">
-                <span style="font-size: 13px; color: #E2E8F0; font-weight: 500;">Total Saldo Kas</span>
-                <span class="rounded-2 d-flex align-items-center justify-content-center" style="width: 30px; height: 30px; background-color: rgba(255,255,255,0.12); color: #FFFFFF;">
+                <span class="fw-medium" style="font-size: 13px; color: #475569;">Total Saldo Kas</span>
+                <span class="rounded-2 d-flex align-items-center justify-content-center" style="width: 30px; height: 30px; background-color: #2F4156; color: #FFFFFF;">
                     <i class="bi bi-wallet2 small"></i>
                 </span>
             </div>
-            <h4 class="fw-bold mb-2" style="font-size: 22px;">Rp {{ number_format($totalSaldoKas, 0, ',', '.') }}</h4>
-            <div style="font-size: 11.5px; color: #94A3B8;">Saldo tercatat saat ini</div>
+            <h4 class="fw-bold mb-2" style="font-size: 22px; color: #2F4156;">Rp {{ number_format($totalSaldoKas, 0, ',', '.') }}</h4>
+            <div class="text-muted" style="font-size: 11.5px;">Saldo aktif keseluruhan</div>
         </div>
     </div>
 
@@ -216,25 +244,127 @@
     <div class="col-md-6 col-xl-3">
         <div class="bendahara-kpi-light p-4 h-100 shadow-sm">
             <div class="d-flex justify-content-between align-items-center mb-3">
-                <span class="fw-medium" style="font-size: 13px; color: #475569;">Menunggu Pencairan</span>
+                <span class="fw-medium" style="font-size: 13px; color: #475569;">Tugas Bendahara</span>
                 <span class="rounded-2 d-flex align-items-center justify-content-center" style="width: 30px; height: 30px; background-color: #E8EEF3; color: #567C8D;">
                     <i class="bi bi-clock small"></i>
                 </span>
             </div>
-            <h4 class="fw-bold mb-2" style="font-size: 22px; color: #2F4156;">{{ str_pad($readyToDisburseCount, 2, '0', STR_PAD_LEFT) }} Pencairan</h4>
-            <div class="text-muted" style="font-size: 11.5px;">Memerlukan tindakan Anda</div>
+            <h4 class="fw-bold mb-2" style="font-size: 22px; color: #2F4156;">{{ str_pad($pendingDisbursements->count(), 2, '0', STR_PAD_LEFT) }} Antrean</h4>
+            <div class="text-muted" style="font-size: 11.5px;">Validasi, pencairan, &amp; cek bukti nota</div>
         </div>
     </div>
 </div>
 
-<!-- 3. BARIS TENGAH ATAS: TRANSAKSI TERBARU & VALIDASI BUKTI -->
+<!-- 3. BARIS TENGAH: FINANCIAL OVERVIEW & ANTREAN KEUANGAN BENDAHARA -->
 <div class="row g-3 mb-4">
+    <!-- Kiri: Financial Overview (Chart) -->
+    <div class="col-lg-8">
+        <div class="nexvo-card p-4 h-100 d-flex flex-column justify-content-between">
+            <div>
+                <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-2">
+                    <div>
+                        <h5 class="fw-bold mb-1" style="font-size: 16px; color: #2F4156;">Financial Overview ({{ $currentYear }})</h5>
+                        <p class="text-muted mb-2" style="font-size: 12px;">Ringkasan arus pemasukan dan pengeluaran organisasi (dalam Juta Rupiah).</p>
+                        <div class="d-flex align-items-center gap-3" style="font-size: 11.5px;">
+                            <span class="d-inline-flex align-items-center gap-1">
+                                <span class="rounded-circle d-inline-block" style="width: 8px; height: 8px; background-color: #567C8D;"></span>
+                                Pemasukan
+                            </span>
+                            <span class="d-inline-flex align-items-center gap-1">
+                                <span class="rounded-circle d-inline-block" style="width: 8px; height: 8px; background-color: #2F4156;"></span>
+                                Pengeluaran
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="p-1 rounded-3" style="background-color: #F4EFEA;">
+                        <button type="button" class="chart-tab-btn" onclick="switchChartMode('jan-jun', this)">Jan - Jun</button>
+                        <button type="button" class="chart-tab-btn" onclick="switchChartMode('jul-des', this)">Jul - Des</button>
+                        <button type="button" class="chart-tab-btn active" onclick="switchChartMode('tahunan', this)">Tahunan</button>
+                    </div>
+                </div>
+
+                <div style="height: 240px;" class="mt-3">
+                    <canvas id="bendaharaOverviewChart"></canvas>
+                </div>
+            </div>
+
+            <div class="d-flex flex-wrap justify-content-between align-items-center text-muted mt-3 pt-2 border-top" style="font-size: 11.5px;">
+                <span>
+                    {{ \Carbon\Carbon::parse(($selectedMonth === 'all' ? now()->format('Y-m') : $selectedMonth) . '-01')->locale('id')->translatedFormat('F Y') }}:
+                    <strong style="color: #1E293B;">Rp {{ number_format($monthlyIncome, 0, ',', '.') }}</strong> masuk &bull;
+                    <strong style="color: #1E293B;">Rp {{ number_format($monthlyExpense, 0, ',', '.') }}</strong> keluar
+                </span>
+                <a href="{{ route('reports.index') }}" class="fw-semibold text-decoration-none" style="color: #2F4156;">
+                    Detail Laporan &rarr;
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Kanan: Antrean Keuangan Bendahara (Gaya Kotak Krem Figma - Maks 3 Item) -->
+    <div class="col-lg-4">
+        <div class="nexvo-card p-4 h-100 d-flex flex-column justify-content-between">
+            <div>
+                <h5 class="fw-bold mb-1" style="font-size: 16px; color: #2F4156;">Antrean Keuangan Bendahara</h5>
+                <p class="text-muted mb-3" style="font-size: 12px;">Pengajuan menunggu validasi, pencairan, atau verifikasi realisasi.</p>
+
+                <div class="d-flex flex-column gap-2.5">
+                    @forelse($pendingDisbursements->take(3) as $item)
+                    @php
+                        $statusLabel = match($item->status) {
+                            'pending_disbursement' => 'Siap Dicairkan',
+                            'pending_bendahara'    => 'Validasi Bendahara',
+                            'pending_ketua'        => 'Menunggu Ketua',
+                            default                => ucfirst(str_replace('_', ' ', $item->status)),
+                        };
+                    @endphp
+                    <div class="queue-item-box d-flex justify-content-between align-items-center gap-2">
+                        <div style="min-width: 0;">
+                            <div class="fw-bold text-truncate mb-0.5" style="font-size: 13px; color: #1E293B;">
+                                {{ $item->title }}
+                            </div>
+                            <div class="text-muted text-truncate mb-2" style="font-size: 11px;">
+                                {{ $item->user->name ?? 'Pengaju' }} &bull; {{ $statusLabel }}
+                            </div>
+                            <div class="d-flex align-items-center gap-3">
+                                <span class="fw-bold" style="font-size: 12.5px; color: #1E293B;">
+                                    Rp {{ number_format($item->amount, 0, ',', '.') }}
+                                </span>
+                                <span class="text-muted" style="font-size: 11px;">
+                                    {{ $item->created_at->locale('id')->translatedFormat('d M Y') }}
+                                </span>
+                            </div>
+                        </div>
+
+                        <a href="{{ route('proposals.index', ['tab' => 'approvals', 'section' => 'penyaluran']) }}" class="btn-proses-dark flex-shrink-0">
+                            Proses
+                        </a>
+                    </div>
+                    @empty
+                    <div class="text-center text-muted py-5" style="font-size: 12.5px;">
+                        <i class="bi bi-check2-circle fs-4 d-block mb-1 text-success"></i>
+                        Tidak ada antrean keuangan saat ini.
+                    </div>
+                    @endforelse
+                </div>
+            </div>
+
+            <a href="{{ route('proposals.index', ['tab' => 'approvals', 'section' => 'penyaluran']) }}" class="btn w-100 rounded-3 py-2 fw-semibold text-center mt-3" style="background-color: #C8D9E6; color: #2F4156; font-size: 12.5px;">
+                Lihat Semua Pengajuan
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- 4. BARIS BAWAH: TRANSAKSI TERBARU & AKTIVITAS TERBARU -->
+<div class="row g-3">
     <!-- Kiri: Transaksi Terbaru -->
     <div class="col-lg-8">
         <div class="nexvo-card p-4 h-100 d-flex flex-column justify-content-between">
             <div>
                 <h5 class="fw-bold mb-1" style="font-size: 16px; color: #2F4156;">Transaksi Terbaru</h5>
-                <p class="text-muted mb-3" style="font-size: 12px;">Aktivitas transaksi keuangan terbaru.</p>
+                <p class="text-muted mb-3" style="font-size: 12px;">Aktivitas transaksi keuangan terbaru pada buku kas.</p>
 
                 <div class="table-responsive">
                     <table class="table align-middle mb-3" style="font-size: 12.5px;">
@@ -275,199 +405,14 @@
         </div>
     </div>
 
-    <!-- Kanan: Validasi Bukti -->
-    <div class="col-lg-4">
-        <div class="nexvo-card p-4 h-100">
-            <h5 class="fw-bold mb-1" style="font-size: 16px; color: #2F4156;">Validasi Bukti</h5>
-            <p class="text-muted mb-3" style="font-size: 12px;">Realisasi menunggu verifikasi anda</p>
-
-            @php
-                $validationItems = $pendingDisbursements->where('status', 'pending_disbursement')->take(4);
-            @endphp
-
-            <div class="d-flex flex-column gap-3">
-                @forelse($validationItems as $item)
-                <div class="d-flex justify-content-between align-items-center pb-2 border-bottom border-light">
-                    <div style="min-width: 0; padding-right: 10px;">
-                        <div class="fw-bold text-truncate" style="font-size: 13px; color: #1E293B;">
-                            {{ $item->user->name ?? 'Pengaju' }}
-                        </div>
-                        <div class="text-muted text-truncate" style="font-size: 11px;">
-                            Realisasi Rp {{ number_format($item->amount, 0, ',', '.') }} &bull; {{ $item->title }}
-                        </div>
-                    </div>
-                    <a href="{{ route('proposals.index', ['tab' => 'approvals', 'section' => 'penyaluran']) }}" class="btn-cairkan flex-shrink-0">
-                        Cairkan
-                    </a>
-                </div>
-                @empty
-                <div class="text-center text-muted py-4" style="font-size: 12.5px;">
-                    <i class="bi bi-check2-circle fs-4 d-block mb-1 text-success"></i>
-                    Semua realisasi bukti sudah terverifikasi.
-                </div>
-                @endforelse
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- 4. BARIS TENGAH BAWAH: FINANCIAL OVERVIEW & PEMERIKSAAN PEMBUKUAN -->
-<div class="row g-3 mb-4">
-    <!-- Kiri: Financial Overview (Chart) -->
-    <div class="col-lg-8">
-        <div class="nexvo-card p-4 h-100">
-            <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-2">
-                <div>
-                    <h5 class="fw-bold mb-1" style="font-size: 16px; color: #2F4156;">Financial Overview</h5>
-                    <p class="text-muted mb-2" style="font-size: 12px;">Ringkasan pemasukan dan pengeluaran organisasi.</p>
-                    <div class="d-flex align-items-center gap-3" style="font-size: 11.5px;">
-                        <span class="d-inline-flex align-items-center gap-1">
-                            <span class="rounded-circle d-inline-block" style="width: 8px; height: 8px; background-color: #567C8D;"></span>
-                            Pemasukan
-                        </span>
-                        <span class="d-inline-flex align-items-center gap-1">
-                            <span class="rounded-circle d-inline-block" style="width: 8px; height: 8px; background-color: #2F4156;"></span>
-                            Pengeluaran
-                        </span>
-                    </div>
-                </div>
-
-                <div class="p-1 rounded-3" style="background-color: #F4EFEA;">
-                    <button type="button" class="chart-tab-btn" onclick="switchChartMode('mingguan', this)">Mingguan</button>
-                    <button type="button" class="chart-tab-btn" onclick="switchChartMode('bulanan', this)">Bulanan</button>
-                    <button type="button" class="chart-tab-btn active" onclick="switchChartMode('tahunan', this)">Tahunan</button>
-                </div>
-            </div>
-
-            <div class="text-muted mb-2" style="font-size: 11px;">Juta rupiah &bull; {{ $currentYear }}</div>
-            <div style="height: 220px;">
-                <canvas id="bendaharaOverviewChart"></canvas>
-            </div>
-
-            <div class="text-muted mt-2 pt-2 border-top" style="font-size: 11px;">
-                {{ \Carbon\Carbon::parse(($selectedMonth === 'all' ? now()->format('Y-m') : $selectedMonth) . '-01')->locale('id')->translatedFormat('F') }}:
-                Rp {{ number_format($monthlyIncome / 1000000, 2, ',', '.') }} jt masuk /
-                Rp {{ number_format($monthlyExpense / 1000000, 2, ',', '.') }} jt keluar
-            </div>
-        </div>
-    </div>
-
-    <!-- Kanan: Pemeriksaan Pembukuan -->
-    <div class="col-lg-4">
-        <div class="nexvo-card p-4 h-100">
-            <h5 class="fw-bold mb-1" style="font-size: 16px; color: #2F4156;">Pemeriksaan Pembukuan</h5>
-            <p class="text-muted mb-3" style="font-size: 12px;">Status kelengkapan dan keseimbangan kas</p>
-
-            <div class="d-flex flex-column gap-3 mt-2" style="font-size: 12.5px;">
-                <div class="d-flex justify-content-between align-items-center py-2 border-bottom border-light">
-                    <span class="text-muted">Neraca saldo (debit + kredit)</span>
-                    <span class="badge rounded-2 px-3 py-1 fw-medium" style="background-color: #C8D9E6; color: #2F4156;">
-                        {{ $totalSaldoKas >= 0 ? 'Seimbang' : 'Defisit' }}
-                    </span>
-                </div>
-
-                <div class="d-flex justify-content-between align-items-center py-2 border-bottom border-light">
-                    <span class="text-muted">Pengeluaran tanpa bukti</span>
-                    <span class="badge rounded-2 px-3 py-1 fw-medium" style="background-color: {{ $expenseWithoutProofCount > 0 ? '#FEE2E2' : '#DCFCE7' }}; color: {{ $expenseWithoutProofCount > 0 ? '#B91C1C' : '#15803D' }};">
-                        {{ $expenseWithoutProofCount }} transaksi
-                    </span>
-                </div>
-
-                <div class="d-flex justify-content-between align-items-center py-2 border-bottom border-light">
-                    <span class="text-muted">Pengajuan dalam proses</span>
-                    <span class="badge rounded-2 px-3 py-1 fw-medium" style="background-color: {{ $pendingProposalsCount > 0 ? '#FEF3C7' : '#F1F5F9' }}; color: {{ $pendingProposalsCount > 0 ? '#B45309' : '#475569' }};">
-                        {{ $pendingProposalsCount }} pengajuan
-                    </span>
-                </div>
-
-                <div class="d-flex justify-content-between align-items-center py-2 border-bottom border-light">
-                    <span class="text-muted">Total transaksi tercatat</span>
-                    <span class="badge rounded-2 px-3 py-1 fw-medium" style="background-color: #E2E8F0; color: #334155;">
-                        {{ $allTrx->count() }} transaksi
-                    </span>
-                </div>
-
-                <div class="d-flex justify-content-between align-items-center py-2">
-                    <span class="text-muted">Pengajuan siap cair</span>
-                    <span class="badge rounded-2 px-3 py-1 fw-medium" style="background-color: #E2E8F0; color: #334155;">
-                        {{ $readyToDisburseCount }} antrean
-                    </span>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- 5. BARIS BAWAH: ANTREAN PENCAIRAN & AKTIVITAS TERBARU -->
-<div class="row g-3">
-    <!-- Kiri: Antrean Pencairan -->
-    <div class="col-lg-8">
-        <div class="nexvo-card p-4 h-100">
-            <div class="d-flex justify-content-between align-items-start mb-3">
-                <div>
-                    <h5 class="fw-bold mb-1" style="font-size: 16px; color: #2F4156;">Antrean Pencairan</h5>
-                    <p class="text-muted mb-0" style="font-size: 12px;">Pengajuan yang sudah disetujui dan menunggu dicairkan</p>
-                </div>
-                <a href="{{ route('proposals.index', ['tab' => 'approvals', 'section' => 'penyaluran']) }}" class="btn btn-sm rounded-3 px-3 py-1 fw-medium" style="background-color: #E2E8F0; color: #334155; font-size: 12px;">
-                    Lihat Semua
-                </a>
-            </div>
-
-            <div class="table-responsive">
-                <table class="table align-middle mb-0" style="font-size: 12.5px;">
-                    <thead>
-                        <tr style="color: #64748B; border-bottom: 1px solid #E2E8F0;">
-                            <th class="fw-medium py-2">Pengaju</th>
-                            <th class="fw-medium py-2">Divisi</th>
-                            <th class="fw-medium py-2">Nominal</th>
-                            <th class="fw-medium py-2 text-center">Status</th>
-                            <th class="fw-medium py-2 text-end">Aksi</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @forelse($pendingDisbursements->take(4) as $prop)
-                        @php
-                            $isReady = ($prop->status === 'pending_disbursement');
-                        @endphp
-                        <tr>
-                            <td class="py-3 fw-bold" style="color: #1E293B;">{{ $prop->user->name ?? 'Pengaju' }}</td>
-                            <td class="py-3 text-muted">{{ $prop->user->division ?? 'Umum' }}</td>
-                            <td class="py-3 fw-semibold" style="color: #1E293B;">Rp {{ number_format($prop->amount, 0, ',', '.') }}</td>
-                            <td class="py-3 text-center">
-                                @if($isReady)
-                                    <span class="badge rounded-2 px-3 py-1 fw-medium" style="background-color: #C8D9E6; color: #2F4156;">
-                                        Siap dicairkan
-                                    </span>
-                                @else
-                                    <span class="badge rounded-2 px-3 py-1 fw-medium" style="background-color: #FEF3C7; color: #B45309;">
-                                        Menunggu Ketua
-                                    </span>
-                                @endif
-                            </td>
-                            <td class="py-3 text-end">
-                                @if($isReady)
-                                    <a href="{{ route('proposals.index', ['tab' => 'approvals', 'section' => 'penyaluran']) }}" class="btn-cairkan">Cairkan</a>
-                                @else
-                                    <a href="{{ route('proposals.index', ['tab' => 'approvals']) }}" class="btn-tinjau-soft">Tinjau</a>
-                                @endif
-                            </td>
-                        </tr>
-                        @empty
-                        <tr>
-                            <td colspan="5" class="text-center text-muted py-4">Tidak ada antrean pencairan saat ini.</td>
-                        </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-
     <!-- Kanan: Aktivitas Terbaru -->
     <div class="col-lg-4">
         <div class="nexvo-card p-4 h-100">
-            <h5 class="fw-bold mb-1" style="font-size: 16px; color: #2F4156;">Aktivitas Terbaru</h5>
-            <p class="text-muted mb-3" style="font-size: 12px;">Aktivitas terbaru organisasi.</p>
+            <div class="d-flex justify-content-between align-items-center mb-1">
+                <h5 class="fw-bold mb-0" style="font-size: 16px; color: #2F4156;">Aktivitas Terbaru</h5>
+                <a href="{{ route('audit-logs.index') }}" class="text-muted text-decoration-none" style="font-size: 11px;">Audit Log</a>
+            </div>
+            <p class="text-muted mb-3" style="font-size: 12px;">Jejak aktivitas sistem &amp; persetujuan terkini.</p>
 
             <div class="d-flex flex-column gap-3">
                 @forelse($recentActivities as $act)
@@ -550,7 +495,13 @@
                         beginAtZero: true,
                         border: { display: false },
                         grid: { color: '#F1F5F9' },
-                        ticks: { font: { size: 11, family: 'Poppins' }, color: '#64748B' }
+                        ticks: {
+                            font: { size: 11, family: 'Poppins' },
+                            color: '#64748B',
+                            callback: function(value) {
+                                return 'Rp ' + value + ' Jt';
+                            }
+                        }
                     }
                 }
             }
@@ -563,24 +514,14 @@
 
         if (!bendaharaChart) return;
 
-        if (mode === 'mingguan') {
-            bendaharaChart.data.labels = ['Minggu 1', 'Minggu 2', 'Minggu 3', 'Minggu 4'];
-            bendaharaChart.data.datasets[0].data = [
-                +(yearlyIncome[{{ now()->month - 1 }}] * 0.3).toFixed(2),
-                +(yearlyIncome[{{ now()->month - 1 }}] * 0.25).toFixed(2),
-                +(yearlyIncome[{{ now()->month - 1 }}] * 0.2).toFixed(2),
-                +(yearlyIncome[{{ now()->month - 1 }}] * 0.25).toFixed(2),
-            ];
-            bendaharaChart.data.datasets[1].data = [
-                +(yearlyExpense[{{ now()->month - 1 }}] * 0.25).toFixed(2),
-                +(yearlyExpense[{{ now()->month - 1 }}] * 0.35).toFixed(2),
-                +(yearlyExpense[{{ now()->month - 1 }}] * 0.2).toFixed(2),
-                +(yearlyExpense[{{ now()->month - 1 }}] * 0.2).toFixed(2),
-            ];
-        } else if (mode === 'bulanan') {
-            bendaharaChart.data.labels = yearlyLabels.slice(Math.max(0, {{ now()->month }} - 6), {{ now()->month }});
-            bendaharaChart.data.datasets[0].data = yearlyIncome.slice(Math.max(0, {{ now()->month }} - 6), {{ now()->month }});
-            bendaharaChart.data.datasets[1].data = yearlyExpense.slice(Math.max(0, {{ now()->month }} - 6), {{ now()->month }});
+        if (mode === 'jan-jun') {
+            bendaharaChart.data.labels = yearlyLabels.slice(0, 6);
+            bendaharaChart.data.datasets[0].data = yearlyIncome.slice(0, 6);
+            bendaharaChart.data.datasets[1].data = yearlyExpense.slice(0, 6);
+        } else if (mode === 'jul-des') {
+            bendaharaChart.data.labels = yearlyLabels.slice(6, 12);
+            bendaharaChart.data.datasets[0].data = yearlyIncome.slice(6, 12);
+            bendaharaChart.data.datasets[1].data = yearlyExpense.slice(6, 12);
         } else {
             bendaharaChart.data.labels = yearlyLabels;
             bendaharaChart.data.datasets[0].data = yearlyIncome;
