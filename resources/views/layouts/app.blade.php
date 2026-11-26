@@ -64,12 +64,13 @@
             width: 38px;
             height: 38px;
             background-color: var(--active-bg);
-            border-radius: 50%;
+            border-radius: 10px;
             display: flex;
             align-items: center;
             justify-content: center;
             font-weight: 700;
             color: var(--navy-dark);
+            flex-shrink: 0;
         }
 
         .menu-label {
@@ -416,7 +417,7 @@
     <div>
         <div class="brand-box">
             <div class="brand-logo-circle">
-                <svg width="20" height="22" viewBox="0 0 100 120" fill="none">
+                <svg width="24" height="26" viewBox="0 0 100 120" fill="none">
                     <path d="M22 108C14 82 22 45 45 20L66 56C82 38 86 18 82 6C92 26 88 58 63 82L43 46C26 66 20 90 22 108Z" fill="#243242"/>
                 </svg>
             </div>
