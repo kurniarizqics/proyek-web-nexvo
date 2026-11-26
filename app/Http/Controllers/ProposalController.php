@@ -36,7 +36,15 @@ class ProposalController extends Controller
         }
 
         if ($tab === 'approvals') {
-            $query = Proposal::with('user')->where('user_id', '!=', $user->id);
+            $query = Proposal::with('user');
+
+            // Di tab Persetujuan (validasi), pengguna tidak boleh memvalidasi pengajuan sendiri.
+            // Namun di section Penyaluran (Antrean Pencairan), Bendahara harus melihat semua
+            // proposal yang siap dicairkan, termasuk yang mereka ajukan sendiri namun telah
+            // disetujui oleh Ketua (status pending_disbursement).
+            if (!$isPenyaluranSection) {
+                $query->where('user_id', '!=', $user->id);
+            }
 
             if ($user->role === 'koordiv') {
                 $query->where('status', 'pending_koordiv')
@@ -132,6 +140,9 @@ class ProposalController extends Controller
             'title' => $request->title,
             'amount' => $request->amount,
             'reason' => $request->reason,
+            'account_number' => $request->account_number,
+            'bank_name' => $request->bank_name,
+            'account_holder_name' => $request->account_holder_name,
             'document_path' => $documentPath,
             'status' => $initialStatus,
         ]);
@@ -147,14 +158,17 @@ class ProposalController extends Controller
         $user = Auth::user();
         $proposal->loadMissing('user');
 
-        // 1. Aturan No Self-Approve
-        if ($proposal->user_id === $user->id) {
+        // 2. Cek apakah ini form pencairan (proposal sudah disetujui, hanya eksekusi pembayaran)
+        $isDisbursementForm = $request->boolean('is_disbursement');
+
+        // 1. Aturan No Self-Approve (tidak berlaku untuk pencairan, karena proposal
+        //    sudah disetujui oleh atasan; di sini bendahara hanya mengeksekusi pembayaran)
+        if ($proposal->user_id === $user->id && !$isDisbursementForm) {
             ActivityLog::record('Percobaan validasi pengajuan milik sendiri', 'failed');
             return back()->with('error', 'Anda tidak dapat memvalidasi pengajuan Anda sendiri.');
         }
 
-        // 2. Cek apakah role ini berwenang memvalidasi tahap pengajuan saat ini (berlaku untuk approve maupun reject)
-        $isDisbursementForm = $request->boolean('is_disbursement');
+        // Cek apakah role ini berwenang memvalidasi tahap pengajuan saat ini (berlaku untuk approve maupun reject)
         $canValidate = false;
 
         if ($user->role === 'koordiv' && $proposal->status === 'pending_koordiv') {

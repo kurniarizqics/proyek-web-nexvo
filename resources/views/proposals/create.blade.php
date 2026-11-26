@@ -67,6 +67,35 @@
             <textarea name="reason" id="reason" class="form-control rounded-3" rows="4" placeholder="Jelaskan rincian penggunaan dana..." style="font-size: 13.5px; padding: 12px 16px; border-color: #E2E8F0;" required>{{ old('reason') }}</textarea>
         </div>
 
+        <!-- Nomor Rekening Tujuan -->
+        <div class="mb-4">
+            <label for="account_number" class="form-label fw-semibold" style="font-size: 13px; color: #1E293B;">Nomor Rekening Tujuan</label>
+            <input type="text" name="account_number" id="account_number" class="form-control rounded-3" value="{{ old('account_number') }}" placeholder="Contoh: 1234567890" style="font-size: 13.5px; padding: 11px 16px; border-color: #E2E8F0;" required>
+            <div class="form-text" style="font-size: 11px; color: #64748B;">Nomor rekening tempat dana akan disalurkan jika pengajuan disetujui.</div>
+        </div>
+
+        <!-- Pemilik Rekening -->
+        <div class="mb-3">
+            <label for="account_holder_name" class="form-label fw-semibold" style="font-size: 13px; color: #1E293B;">Nama Pemilik Rekening</label>
+            <input type="text" name="account_holder_name" id="account_holder_name" class="form-control rounded-3" value="{{ old('account_holder_name') }}" placeholder="Contoh: Raka Pratama" style="font-size: 13.5px; padding: 11px 16px; border-color: #E2E8F0;" required>
+            <div class="form-text" style="font-size: 11px; color: #64748B;">Nama sesuai yang tertera pada rekening bank.</div>
+        </div>
+
+        <!-- Bank Tujuan -->
+        <div class="mb-4">
+            <label for="bank_name" class="form-label fw-semibold" style="font-size: 13px; color: #1E293B;">Bank</label>
+            <select name="bank_name" id="bank_name" class="form-select rounded-3" style="font-size: 13.5px; padding: 11px 16px; border-color: #E2E8F0;" required>
+                <option value="">Pilih bank</option>
+                <option value="BCA" {{ old('bank_name') === 'BCA' ? 'selected' : '' }}>BCA</option>
+                <option value="BRI" {{ old('bank_name') === 'BRI' ? 'selected' : '' }}>BRI</option>
+                <option value="BNI" {{ old('bank_name') === 'BNI' ? 'selected' : '' }}>BNI</option>
+                <option value="Mandiri" {{ old('bank_name') === 'Mandiri' ? 'selected' : '' }}>Mandiri</option>
+                <option value="BSI" {{ old('bank_name') === 'BSI' ? 'selected' : '' }}>BSI (Bank Syariah Indonesia)</option>
+                <option value="Lainnya" {{ old('bank_name') === 'Lainnya' ? 'selected' : '' }}>Lainnya</option>
+            </select>
+            <div class="form-text" style="font-size: 11px; color: #64748B;">Pilih bank tempat rekening berada.</div>
+        </div>
+
         <!-- Dokumen Pendukung (Opsional Drag & Drop Box) -->
         <div class="mb-4">
             <label class="form-label fw-semibold mb-0" style="font-size: 13px; color: #1E293B;">Dokumen Pendukung <span class="text-muted fw-normal">(Opsional)</span></label>

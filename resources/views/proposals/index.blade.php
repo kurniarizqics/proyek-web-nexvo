@@ -404,6 +404,10 @@
     $ext = $prop->document_path ? strtolower(pathinfo($prop->document_path, PATHINFO_EXTENSION)) : null;
     $isImage = in_array($ext, ['jpg', 'jpeg', 'png']);
 
+    $accountNumber = $prop->account_number ?? '-';
+    $bankName = $prop->bank_name ?? '-';
+    $accountHolderName = $prop->account_holder_name ?? '-';
+
     preg_match('/(BCA|BRI|BNI|Mandiri|BSI|DANA|OVO|GoPay)\s*[-:]?\s*\d{6,}/i', $prop->reason, $rekMatch);
     $rekeningTujuan = $rekMatch[0] ?? 'BCA 0123456789';
     $saldoSetelahCair = $saldoKasSekarang - $prop->amount;
@@ -443,10 +447,20 @@
                         </div>
 
                         <div class="d-flex justify-content-between align-items-center py-1">
-                            <span style="color: #64748B;">Rekening tujuan</span>
+                            <span style="color: #64748B;">Pemilik Rekening</span>
+                            <span class="fw-semibold text-end" style="color: #1E293B;">{{ $accountHolderName }}</span>
+                        </div>
+
+                        <div class="d-flex justify-content-between align-items-center py-1">
+                            <span style="color: #64748B;">Bank</span>
+                            <span class="fw-semibold text-end" style="color: #1E293B;">{{ $bankName }}</span>
+                        </div>
+
+                        <div class="d-flex justify-content-between align-items-center py-1">
+                            <span style="color: #64748B;">Nomor Rekening</span>
                             <div class="d-flex align-items-center gap-2">
-                                <span class="fw-semibold" id="rekText{{ $prop->id }}" style="color: #1E293B;">{{ $rekeningTujuan }}</span>
-                                <button type="button" class="btn btn-link p-0 text-muted" title="Salin Rekening" onclick="copyRekening('{{ $rekeningTujuan }}', this)">
+                                <span class="fw-semibold" id="rekText{{ $prop->id }}" style="color: #1E293B;">{{ $accountNumber }}</span>
+                                <button type="button" class="btn btn-link p-0 text-muted" title="Salin Nomor Rekening" onclick="copyRekening('{{ $accountNumber }}', this)">
                                     <i class="bi bi-copy"></i>
                                 </button>
                             </div>
