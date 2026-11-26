@@ -52,11 +52,17 @@
 <!-- Card Daftar Pengguna -->
 <div class="nexvo-card p-4">
     <!-- Filter & Pencarian -->
-    <form method="GET" action="{{ route('admin.users.index') }}" class="row g-2 mb-4">
-        <div class="col-md-5">
+    @php
+        $hasActiveFilter = filled(request('search')) || filled(request('role')) || filled(request('status'));
+    @endphp
+    <form id="userFilterForm" method="GET" action="{{ route('admin.users.index') }}" class="row g-2 mb-4">
+        <div class="{{ $hasActiveFilter ? 'col-md-5' : 'col-md-6' }}">
             <div class="input-group">
                 <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
-                <input type="text" name="search" value="{{ request('search') }}" class="form-control border-start-0" placeholder="Cari nama, email, atau divisi..." style="font-size: 13px;">
+                <input type="text" id="userSearchInput" name="search" value="{{ request('search') }}" class="form-control border-start-0 {{ request('search') ? 'border-end-0' : '' }}" placeholder="Cari nama, email, atau divisi..." style="font-size: 13px;">
+                <button type="button" id="clearUserSearchBtn" class="input-group-text bg-white border-start-0 text-muted {{ request('search') ? '' : 'd-none' }}" title="Hapus pencarian" style="cursor: pointer;">
+                    <i class="bi bi-x-lg" style="font-size: 12px;"></i>
+                </button>
             </div>
         </div>
         <div class="col-md-3">
@@ -69,19 +75,20 @@
                 <option value="anggota" {{ request('role') === 'anggota' ? 'selected' : '' }}>Anggota</option>
             </select>
         </div>
-        <div class="col-md-2">
+        <div class="col-md-3">
             <select name="status" class="form-select" style="font-size: 13px;" onchange="this.form.submit()">
                 <option value="">Semua Status</option>
                 <option value="active" {{ request('status') === 'active' ? 'selected' : '' }}>Aktif</option>
                 <option value="inactive" {{ request('status') === 'inactive' ? 'selected' : '' }}>Nonaktif</option>
             </select>
         </div>
-        <div class="col-md-2 d-flex gap-2">
-            <button type="submit" class="btn btn-nexvo-dark w-100">Filter</button>
-            @if(request()->hasAny(['search', 'role', 'status']))
-                <a href="{{ route('admin.users.index') }}" class="btn btn-light border" title="Reset Filter"><i class="bi bi-arrow-counterclockwise"></i></a>
-            @endif
+        @if($hasActiveFilter)
+        <div class="col-md-1">
+            <a href="{{ route('admin.users.index') }}" class="btn btn-light border w-100 h-100 d-flex align-items-center justify-content-center" title="Reset Semua Filter">
+                <i class="bi bi-x-lg text-muted" style="font-size: 13px;"></i>
+            </a>
         </div>
+        @endif
     </form>
 
     <!-- Tabel Pengguna -->
@@ -287,10 +294,42 @@
 
 @push('scripts')
 <script>
-    @if(request()->query('modal') === 'create')
-        document.addEventListener('DOMContentLoaded', function () {
+    document.addEventListener('DOMContentLoaded', function () {
+        @if(request()->query('modal') === 'create')
             new bootstrap.Modal(document.getElementById('createUserModal')).show();
-        });
-    @endif
+        @endif
+
+        const filterForm = document.getElementById('userFilterForm');
+        const searchInput = document.getElementById('userSearchInput');
+        const clearBtn = document.getElementById('clearUserSearchBtn');
+        let searchTimer;
+
+        if (searchInput && clearBtn && filterForm) {
+            // Kembalikan fokus & posisi kursor ke ujung teks setelah auto-submit reload
+            if (searchInput.value.length > 0 && document.activeElement !== searchInput) {
+                searchInput.focus();
+                const len = searchInput.value.length;
+                searchInput.setSelectionRange(len, len);
+            }
+
+            searchInput.addEventListener('input', function () {
+                const hasText = this.value.length > 0;
+                clearBtn.classList.toggle('d-none', !hasText);
+                this.classList.toggle('border-end-0', hasText);
+
+                clearTimeout(searchTimer);
+                searchTimer = setTimeout(() => {
+                    filterForm.submit();
+                }, 400);
+            });
+
+            clearBtn.addEventListener('click', function () {
+                searchInput.value = '';
+                clearBtn.classList.add('d-none');
+                searchInput.classList.remove('border-end-0');
+                filterForm.submit();
+            });
+        }
+    });
 </script>
 @endpush
